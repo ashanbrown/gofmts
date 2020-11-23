@@ -1,0 +1,18 @@
+minimum_pre_commit_version: "2.0.1"
+
+repos:
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v1.32.2
+    hooks:
+      - id: golangci-lint
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v3.3.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-json
+      - id: check-symlinks
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: no-commit-to-branch
+      - id: trailing-whitespace
