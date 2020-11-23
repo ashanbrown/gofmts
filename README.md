@@ -1,4 +1,4 @@
-#! gofmts formats strings in go programs
+# gofmts formats strings in go programs
 
 ## Usage
 
