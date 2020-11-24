@@ -59,7 +59,7 @@ type UnusedDirective struct {
 }
 
 func (i UnusedDirective) Details() string {
-	return fmt.Sprintf("unused directive `%s:%s`", directivePrefix, i.name)
+	return fmt.Sprintf("unused directive `%s%s`", directivePrefix, i.name)
 }
 
 func (i UnusedDirective) Position() token.Position {
@@ -76,7 +76,7 @@ type UnknownDirective struct {
 }
 
 func (i UnknownDirective) Details() string {
-	return fmt.Sprintf("unknown directive `%s:%s`", directivePrefix, i.directive)
+	return fmt.Sprintf("unknown directive `%s%s`", directivePrefix, i.directive)
 }
 
 func (i UnknownDirective) Position() token.Position {
@@ -94,7 +94,7 @@ type FailedDirective struct {
 }
 
 func (i FailedDirective) Details() string {
-	return fmt.Sprintf("failed directive `%s`: %s", i.directive, i.error)
+	return fmt.Sprintf("failed directive %q: %s", i.directive, i.error)
 }
 
 func (i FailedDirective) Position() token.Position {
@@ -144,10 +144,11 @@ func (f *Formatter) Run(fset *token.FileSet, nodes ...ast.Node) ([]Issue, error)
 }
 
 func (v *visitor) Visit(node ast.Node) ast.Visitor {
+ParseNode:
 	switch node := node.(type) {
 	case *ast.BasicLit:
 		if node.Kind == token.STRING {
-			closestDirectivePos, closestDirective := findClosestDirective(v.directivesByPos, node.Pos())
+			closestDirectivePos, closestDirective := findClosestDirective(v.fset, v.directivesByPos, node.End())
 			if !closestDirectivePos.IsValid() {
 				break
 			}
@@ -165,6 +166,7 @@ func (v *visitor) Visit(node ast.Node) ast.Visitor {
 					directive: closestDirective,
 					position:  v.fset.Position(closestDirectivePos),
 				})
+				break ParseNode
 			}
 			if err != nil {
 				v.issues = append(v.issues, FailedDirective{
@@ -172,7 +174,9 @@ func (v *visitor) Visit(node ast.Node) ast.Visitor {
 					position:  v.fset.Position(closestDirectivePos),
 					error:     err,
 				})
+				break
 			}
+
 			var replacementBuf bytes.Buffer
 			replacementBuf.WriteByte(node.Value[0])
 			isMultiline := strings.Contains(newValue, "\n") || v.fset.Position(node.Pos()).Line != v.fset.Position(node.End()).Line
@@ -202,10 +206,11 @@ func (v *visitor) Visit(node ast.Node) ast.Visitor {
 	return v
 }
 
-func findClosestDirective(directivesByPos map[token.Pos]string, nodePos token.Pos) (pos token.Pos, directive string) {
+func findClosestDirective(fset *token.FileSet, directivesByPos map[token.Pos]string, nodeEndPos token.Pos) (pos token.Pos, directive string) {
 	pos = token.NoPos
 	for p, d := range directivesByPos {
-		if p < nodePos && p > pos {
+		onSameOrEarlierLine := fset.Position(p).Line <= fset.Position(nodeEndPos).Line
+		if onSameOrEarlierLine && p > pos {
 			pos = p
 			directive = d
 		}
@@ -230,6 +235,7 @@ func formatSql(value string) (string, error) {
 
 	outBuf := new(bytes.Buffer)
 	r := sqlfmt.NewTextRenderer(outBuf)
+	r.UpperCase = true
 	stmt.RenderTo(r)
 	return outBuf.String(), nil
 }
