@@ -5,9 +5,9 @@ import (
 	"go/printer"
 	"go/scanner"
 	"io/ioutil"
-	"log"
 
 	"github.com/ashanbrown/gfmts/pkg/gofmts"
+	"github.com/pkg/errors"
 )
 
 func reformatFile(file *ast.File) error {
@@ -22,14 +22,14 @@ func sortFile(src []byte) ([]byte, error) {
 	if err != nil {
 		tmpfile, tmpfileErr := ioutil.TempFile("", "gofmts-presorted*.go")
 		if tmpfileErr != nil {
-			log.Printf("internal error: unable to write tempfile for presorted: %s", tmpfileErr)
+			report(errors.Errorf("internal error: unable to write tempfile for presorted: %s", tmpfileErr))
 		} else {
-			log.Printf("internal error: writing temporary file for failed format prior to sort at %s", tmpfile.Name())
+			report(errors.Errorf("internal error: writing temporary file for failed format prior to sort at %s", tmpfile.Name()))
 			if _, err := tmpfile.Write(src); err != nil {
-				log.Printf("internal error: unable to write to tempfile: %s", err)
+				report(errors.Errorf("internal error: unable to write to tempfile: %s", err))
 			}
 			if err := tmpfile.Close(); err != nil {
-				log.Printf("internal error: unable to write to tempfile: %s", err)
+				report(errors.Errorf("internal error: unable to write to tempfile: %s", err))
 			}
 		}
 		return nil, err
