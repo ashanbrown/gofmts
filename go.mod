@@ -3,7 +3,9 @@ module github.com/ashanbrown/gfmts
 go 1.15
 
 require (
+	github.com/dave/dst v0.26.2
 	github.com/jackc/sqlfmt v0.1.1-0.20191221211249-d576133216e1
+	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.6.1
 	github.com/tidwall/pretty v1.0.2

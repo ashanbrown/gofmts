@@ -1,4 +1,4 @@
-package formatter
+package gofmts
 
 import (
 	"go/ast"
@@ -30,11 +30,12 @@ func TestFormatter(t *testing.T) {
 		require.Len(t, issues, 1)
 		assert.Equal(t, "json formatting differs", issues[0].Details())
 		assert.Equal(t, 4, issues[0].Position().Line)
+		require.Implements(t, (*IssueWithReplacement)(nil), issues[0])
 		assert.Equal(t, "`"+`
 		  {
 		    "a": 1
 		  }
-		  `+"`", *issues[0].Replacement())
+		  `+"`", issues[0].(IssueWithReplacement).Replacement())
 		assert.Equal(t, "json formatting differs at 4:18", issues[0].String())
 	})
 
@@ -42,16 +43,17 @@ func TestFormatter(t *testing.T) {
 		issues, err := fmtr.Run(makeInputs(t,
 			`package main
 
-				const json = `+"`{\"a\":    \"1\"}`"+`//gofmts:json`))
+				const json = `+"`{\"a\":    1}`"+`//gofmts:json`))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "json formatting differs", issues[0].Details())
 		assert.Equal(t, 3, issues[0].Position().Line)
+		require.Implements(t, (*IssueWithReplacement)(nil), issues[0])
 		assert.Equal(t, "`"+`
 		  {
 		    "a": 1
 		  }
-		  `+"`", *issues[0].Replacement())
+		  `+"`", issues[0].(IssueWithReplacement).Replacement())
 		assert.Equal(t, "json formatting differs at 3:18", issues[0].String())
 	})
 
@@ -65,8 +67,7 @@ func TestFormatter(t *testing.T) {
 		require.Len(t, issues, 1)
 		assert.Equal(t, `failed directive "json": json is not valid`, issues[0].Details())
 		assert.Equal(t, 3, issues[0].Position().Line)
-		assert.Nil(t, issues[0].Replacement())
-		assert.Equal(t, `failed directive "json": json is not valid at 3:48`, issues[0].String())
+		assert.Equal(t, `failed directive "json": json is not valid at 3:18`, issues[0].String())
 	})
 
 	t.Run("sql directive", func(t *testing.T) {
@@ -79,12 +80,13 @@ func TestFormatter(t *testing.T) {
 		require.Len(t, issues, 1)
 		assert.Equal(t, "sql formatting differs", issues[0].Details())
 		assert.Equal(t, 4, issues[0].Position().Line)
+		require.Implements(t, (*IssueWithReplacement)(nil), issues[0])
 		assert.Equal(t, "`"+`
 		 SELECT
 		   *
 		 FROM
 		   mytable
-		 `+"`", *issues[0].Replacement())
+		 `+"`", issues[0].(IssueWithReplacement).Replacement())
 		assert.Equal(t, "sql formatting differs at 4:17", issues[0].String())
 	})
 
@@ -99,7 +101,6 @@ func TestFormatter(t *testing.T) {
 		require.Len(t, issues, 1)
 		assert.Equal(t, "unknown directive `gofmts:unknown`", issues[0].Details())
 		assert.Equal(t, 3, issues[0].Position().Line)
-		assert.Nil(t, issues[0].Replacement())
 		assert.Equal(t, "unknown directive `gofmts:unknown` at 3:21", issues[0].String())
 	})
 
@@ -113,7 +114,6 @@ func TestFormatter(t *testing.T) {
 		require.Len(t, issues, 1)
 		assert.Equal(t, "unused directive `gofmts:sql`", issues[0].Details())
 		assert.Equal(t, 3, issues[0].Position().Line)
-		assert.Nil(t, issues[0].Replacement())
 		assert.Equal(t, "unused directive `gofmts:sql` at 3:17", issues[0].String())
 	})
 }
