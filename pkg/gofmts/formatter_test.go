@@ -35,7 +35,7 @@ func TestFormatter(t *testing.T) {
 		  {
 		    "a": 1
 		  }
-		  `+"`", issues[0].(IssueWithReplacement).Replacement())
+		  `+"`\n", issues[0].(IssueWithReplacement).Replacement())
 		assert.Equal(t, "json formatting differs at 4:18", issues[0].String())
 	})
 
@@ -53,7 +53,7 @@ func TestFormatter(t *testing.T) {
 		  {
 		    "a": 1
 		  }
-		  `+"`", issues[0].(IssueWithReplacement).Replacement())
+		  `+"`\n", issues[0].(IssueWithReplacement).Replacement())
 		assert.Equal(t, "json formatting differs at 3:18", issues[0].String())
 	})
 
@@ -68,6 +68,19 @@ func TestFormatter(t *testing.T) {
 		assert.Equal(t, `failed directive "json": json is not valid`, issues[0].Details())
 		assert.Equal(t, 3, issues[0].Position().Line)
 		assert.Equal(t, `failed directive "json": json is not valid at 3:18`, issues[0].String())
+	})
+
+	t.Run("wrong quotes for multiline string", func(t *testing.T) {
+		issues, err := fmtr.Run(makeInputs(t,
+			`package main
+
+				//gofmts:sql
+				const sql = "SELECT * FROM mytable"`))
+		require.NoError(t, err)
+		require.Len(t, issues, 1)
+		assert.Equal(t, `failed directive "sql": reformatted string will be multiline and must be quoted using backticks`, issues[0].Details())
+		assert.Equal(t, 4, issues[0].Position().Line)
+		assert.Equal(t, `failed directive "sql": reformatted string will be multiline and must be quoted using backticks at 4:17`, issues[0].String())
 	})
 
 	t.Run("sql directive", func(t *testing.T) {
@@ -86,7 +99,7 @@ func TestFormatter(t *testing.T) {
 		   *
 		 FROM
 		   mytable
-		 `+"`", issues[0].(IssueWithReplacement).Replacement())
+		 `+"`\n", issues[0].(IssueWithReplacement).Replacement())
 		assert.Equal(t, "sql formatting differs at 4:17", issues[0].String())
 	})
 

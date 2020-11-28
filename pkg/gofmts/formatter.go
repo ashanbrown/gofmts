@@ -2,11 +2,13 @@
 package gofmts
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"go/ast"
 	"go/token"
+	"io"
 	"strings"
 	"unicode"
 
@@ -229,25 +231,30 @@ ParseNode:
 				break
 			}
 
-			var replacementBuf bytes.Buffer
-			replacementBuf.WriteByte(node.Value[0])
 			isMultiline := strings.Contains(newValue, "\n") || v.fset.Position(astNode.Pos()).Line != v.fset.Position(astNode.End()).Line
-			if isMultiline {
-				indentColumn := v.fset.Position(astNode.Pos()).Column
-				indent := strings.Repeat("\t", indentColumn/8) + strings.Repeat(" ", indentColumn%8)
-				_, _ = replacementBuf.WriteString("\n")
-				lines := strings.Split(newValue, "\n")
-				for i, line := range lines {
-					replacementBuf.WriteString(indent)
-					_, _ = replacementBuf.WriteString(line)
-					if i < len(lines)-1 {
-						replacementBuf.WriteString("\n")
-					}
+			if isMultiline && node.Value[0] != '`' {
+				issue := FailedDirective{
+					directive: closestDirective,
+					position:  v.fset.Position(astNode.Pos()),
+					error:     errors.New("reformatted string will be multiline and must be quoted using backticks"),
 				}
-			} else {
-				replacementBuf.WriteString(newValue)
+				v.issues = append(v.issues, issue)
+				break
 			}
-			replacementBuf.WriteByte(node.Value[len(node.Value)-1])
+
+			replacementBuf := new(bytes.Buffer)
+			_, _ = io.WriteString(replacementBuf, node.Value[0:1])
+			if isMultiline {
+				// start a new line so that tabs and spaces line up (because not all editors use the same tab width)
+				_, _ = io.WriteString(replacementBuf, "\n")
+
+				iw := NewIndentWriter(replacementBuf, v.fset.Position(astNode.Pos()).Column, 8 /* tab width */)
+				_ = iw.WriteString(newValue)
+				_ = iw.WriteString(node.Value[len(node.Value)-1 : len(node.Value)])
+			} else {
+				_, _ = io.WriteString(replacementBuf, newValue)
+				_, _ = io.WriteString(replacementBuf, node.Value[len(node.Value)-1:])
+			}
 
 			// continue to next node if there are no changes
 			if replacementBuf.String() == node.Value {
@@ -307,4 +314,33 @@ func formatSql(value string) (string, error) {
 	r.UpperCase = true
 	stmt.RenderTo(r)
 	return outBuf.String(), nil
+}
+
+type indentWriter struct {
+	w      io.Writer
+	indent string
+}
+
+func NewIndentWriter(w io.Writer, indentColumn, tabWidth int) indentWriter {
+	iw := indentWriter{
+		w:      w,
+		indent: strings.Repeat("\t", indentColumn/tabWidth) + strings.Repeat(" ", indentColumn%tabWidth),
+	}
+	return iw
+}
+
+func (w indentWriter) WriteString(p string) error {
+	scanner := bufio.NewScanner(bytes.NewBufferString(p))
+	for scanner.Scan() {
+		if _, err := io.WriteString(w.w, w.indent); err != nil {
+			return err
+		}
+		if _, err := w.w.Write(scanner.Bytes()); err != nil {
+			return err
+		}
+		if _, err := io.WriteString(w.w, "\n"); err != nil {
+			return err
+		}
+	}
+	return nil
 }
