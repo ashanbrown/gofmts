@@ -1,5 +1,5 @@
 // formatter reformats strings
-package formatter
+package gofmts
 
 import (
 	"bytes"
@@ -13,13 +13,19 @@ import (
 	"github.com/jackc/sqlfmt"
 	"github.com/pkg/errors"
 	"github.com/tidwall/pretty"
+	"golang.org/x/tools/go/ast/astutil"
 )
 
 type Issue interface {
 	Details() string
 	Position() token.Position
 	String() string
-	Replacement() *string
+}
+
+type IssueWithReplacement interface {
+	Issue
+	Replacement() string
+	Length() int
 }
 
 type Formatter struct {
@@ -34,6 +40,7 @@ func NewFormatter() *Formatter {
 type FormatIssue struct {
 	directive   string
 	position    token.Position
+	end         token.Position
 	replacement string
 }
 
@@ -45,9 +52,13 @@ func (i FormatIssue) Position() token.Position {
 	return i.position
 }
 
+func (i FormatIssue) Length() int {
+	return i.end.Offset - i.position.Offset
+}
+
 func (i FormatIssue) String() string { return toString(i) }
 
-func (i FormatIssue) Replacement() *string { return &i.replacement }
+func (i FormatIssue) Replacement() string { return i.replacement }
 
 func toString(i Issue) string {
 	return fmt.Sprintf("%s at %s", i.Details(), i.Position())
@@ -68,8 +79,6 @@ func (i UnusedDirective) Position() token.Position {
 
 func (i UnusedDirective) String() string { return toString(i) }
 
-func (i UnusedDirective) Replacement() *string { return nil }
-
 type UnknownDirective struct {
 	directive string
 	position  token.Position
@@ -84,8 +93,6 @@ func (i UnknownDirective) Position() token.Position {
 }
 
 func (i UnknownDirective) String() string { return toString(i) }
-
-func (i UnknownDirective) Replacement() *string { return nil }
 
 type FailedDirective struct {
 	directive string
@@ -103,18 +110,33 @@ func (i FailedDirective) Position() token.Position {
 
 func (i FailedDirective) String() string { return toString(i) }
 
-func (i FailedDirective) Replacement() *string { return nil }
-
 type visitor struct {
 	directivesByPos map[token.Pos]string
 	fset            *token.FileSet
 	issues          []Issue
+	issuesByPos     map[token.Pos]Issue
 }
 
+func Rewrite(fset *token.FileSet, nodes ...ast.Node) error {
+	f := Formatter{}
+	issues, err := f.Run(fset, nodes...)
+	if err != nil {
+		return err
+	}
+	for _, i := range issues {
+		if _, hasReplacement := i.(IssueWithReplacement); !hasReplacement {
+			return errors.New(i.Details())
+		}
+	}
+	return nil
+}
+
+// nodes may be modified by this method
 func (f *Formatter) Run(fset *token.FileSet, nodes ...ast.Node) ([]Issue, error) {
-	directivesByPos := make(map[token.Pos]string) // nolint:prealloc // don't know how many there will be
-	var issues []Issue                            // nolint:prealloc // don't know how many there will be
+	var issues []Issue // nolint:prealloc // don't know how many there will be
 	for _, node := range nodes {
+		directivesByPos := make(map[token.Pos]string) // nolint:prealloc // don't know how many there will be
+		issuesByPos := make(map[token.Pos]Issue)      // nolint:prealloc // don't know how many there will be
 		switch node := node.(type) {
 		case *ast.File:
 			for _, group := range node.Comments {
@@ -124,6 +146,10 @@ func (f *Formatter) Run(fset *token.FileSet, nodes ...ast.Node) ([]Issue, error)
 					}
 
 					if strings.HasPrefix(comment.Text[2:], directivePrefix) {
+						// ignore sort directives
+						if strings.HasPrefix(comment.Text[2:], directivePrefix+"sort") {
+							continue
+						}
 						parts := strings.SplitN(comment.Text[2:], ":", 2)
 						directivesByPos[comment.End()] = strings.TrimRightFunc(parts[1], unicode.IsSpace)
 					}
@@ -132,6 +158,7 @@ func (f *Formatter) Run(fset *token.FileSet, nodes ...ast.Node) ([]Issue, error)
 		}
 		visitor := visitor{
 			directivesByPos: directivesByPos,
+			issuesByPos:     issuesByPos,
 			fset:            fset,
 		}
 		ast.Walk(&visitor, node)
@@ -139,6 +166,30 @@ func (f *Formatter) Run(fset *token.FileSet, nodes ...ast.Node) ([]Issue, error)
 		for pos, d := range directivesByPos {
 			issues = append(issues, UnusedDirective{name: d, position: fset.Position(pos)})
 		}
+
+		// apply replacements
+		astutil.Apply(node, nil, func(c *astutil.Cursor) bool {
+			switch node := c.Node().(type) {
+			case *ast.BasicLit:
+				issue, exists := issuesByPos[node.Pos()].(IssueWithReplacement)
+				if !exists {
+					break
+				}
+				replacementNode := &ast.BasicLit{
+					Kind:  token.STRING,
+					Value: issue.Replacement(),
+				}
+				c.Replace(replacementNode)
+			}
+			return true
+		})
+
+		srtr := Sorter{}
+		sortIssues, err := srtr.run(fset, node)
+		if err != nil {
+			return nil, errors.Wrapf(err, "sort failed")
+		}
+		issues = append(issues, sortIssues...)
 	}
 	return issues, nil
 }
@@ -148,7 +199,7 @@ ParseNode:
 	switch node := node.(type) {
 	case *ast.BasicLit:
 		if node.Kind == token.STRING {
-			closestDirectivePos, closestDirective := findClosestDirective(v.fset, v.directivesByPos, node.End())
+			closestDirectivePos, closestDirective := findClosestDirective(v.fset, v.directivesByPos, node, false)
 			if !closestDirectivePos.IsValid() {
 				break
 			}
@@ -196,21 +247,32 @@ ParseNode:
 				replacementBuf.WriteString(newValue)
 			}
 			replacementBuf.WriteByte(node.Value[len(node.Value)-1])
-			v.issues = append(v.issues, FormatIssue{
+			issue := FormatIssue{
 				directive:   closestDirective,
 				position:    v.fset.Position(node.Pos()),
+				end:         v.fset.Position(node.End()),
 				replacement: replacementBuf.String(),
-			})
+			}
+			v.issuesByPos[node.Pos()] = issue
+			v.issues = append(v.issues, issue)
 		}
 	}
 	return v
 }
 
-func findClosestDirective(fset *token.FileSet, directivesByPos map[token.Pos]string, nodeEndPos token.Pos) (pos token.Pos, directive string) {
+func findClosestDirective(fset *token.FileSet, directivesByPos map[token.Pos]string, node ast.Node, ignoreInline bool) (pos token.Pos, directive string) {
 	pos = token.NoPos
 	for p, d := range directivesByPos {
-		onSameOrEarlierLine := fset.Position(p).Line <= fset.Position(nodeEndPos).Line
-		if onSameOrEarlierLine && p > pos {
+		directiveStartLine := fset.Position(p).Line
+		var applies bool
+		if ignoreInline {
+			nodeStartLine := fset.Position(node.Pos()).Line
+			applies = directiveStartLine <= nodeStartLine
+		} else {
+			nodeEndLine := fset.Position(node.End()).Line
+			applies = directiveStartLine <= nodeEndLine
+		}
+		if applies && p > pos {
 			pos = p
 			directive = d
 		}

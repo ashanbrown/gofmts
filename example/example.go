@@ -9,3 +9,21 @@ FROM
 
 //gofmts:json
 const Json = `{"a":  1, "b":2}`
+
+//gofmts:sort
+const Z = 1
+const A = 2
+
+const (
+	//gofmts:sort
+	// ignore this
+	Z1 = 1
+	A2 = 2
+)
+
+const (
+	//gofmts:sort
+	Z3 = 1
+	// move this
+	A3 = 2
+)
