@@ -15,4 +15,27 @@ repos:
       - id: check-yaml
       - id: end-of-file-fixer
       - id: no-commit-to-branch
-      - id: trailing-whitespace
+
+  - repo: local
+    hooks:
+      - id: gofmts
+        name: Dogfooding (gofmts)
+        description: Run gofmts on itself
+        entry: go run ./cmd/gofmts -l -w
+        language: system
+        require_serial: true
+        types: [go]
+        exclude: "example/example.go"
+      - id: generate
+        name: generate
+        description: ensure that running go generate changes nothing
+        types: [go]
+        language: system
+        require_serial: true
+        entry: go generate ./...
+
+  - repo: https://github.com/TekWizely/pre-commit-golang
+    rev: v0.8.0
+    hooks:
+      - id: go-build-mod
+      - id: go-test-mod

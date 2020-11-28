@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"go/ast"
+	"go/format"
 	"go/token"
 	"io"
 	"strings"
@@ -215,6 +216,8 @@ ParseNode:
 				newValue, err = formatJson(value)
 			case "mysql", "postgresql", "sql":
 				newValue, err = formatSql(value)
+			case "go":
+				newValue, err = formatGo(value)
 			default:
 				v.issues = append(v.issues, UnknownDirective{
 					directive: closestDirective,
@@ -248,9 +251,12 @@ ParseNode:
 				// start a new line so that tabs and spaces line up (because not all editors use the same tab width)
 				_, _ = io.WriteString(replacementBuf, "\n")
 
-				iw := NewIndentWriter(replacementBuf, v.fset.Position(astNode.Pos()).Column, 8 /* tab width */)
-				_ = iw.WriteString(newValue)
-				_ = iw.WriteString(node.Value[len(node.Value)-1 : len(node.Value)])
+				// the indent column is basically a WAG because we don't know what's a tab and what's a space
+				indentColumn := v.fset.Position(astNode.Pos()).Column
+
+				iw := NewIndentWriter(replacementBuf, indentColumn, 8 /* tab width */)
+				_ = iw.WriteString(newValue, false)
+				_ = iw.WriteString(node.Value[len(node.Value)-1:], true)
 			} else {
 				_, _ = io.WriteString(replacementBuf, newValue)
 				_, _ = io.WriteString(replacementBuf, node.Value[len(node.Value)-1:])
@@ -316,6 +322,14 @@ func formatSql(value string) (string, error) {
 	return outBuf.String(), nil
 }
 
+func formatGo(value string) (string, error) {
+	formatted, err := format.Source([]byte(value))
+	if err != nil {
+		return "", errors.Wrapf(err, "unable to format go code")
+	}
+	return string(formatted), nil
+}
+
 type indentWriter struct {
 	w      io.Writer
 	indent string
@@ -323,13 +337,13 @@ type indentWriter struct {
 
 func NewIndentWriter(w io.Writer, indentColumn, tabWidth int) indentWriter {
 	iw := indentWriter{
-		w:      w,
-		indent: strings.Repeat("\t", indentColumn/tabWidth) + strings.Repeat(" ", indentColumn%tabWidth),
+		w: w,
+		indent: strings.Repeat("	", indentColumn/tabWidth) + strings.Repeat(" ", indentColumn%tabWidth),
 	}
 	return iw
 }
 
-func (w indentWriter) WriteString(p string) error {
+func (w indentWriter) WriteString(p string, skipNewline bool) error {
 	scanner := bufio.NewScanner(bytes.NewBufferString(p))
 	for scanner.Scan() {
 		if _, err := io.WriteString(w.w, w.indent); err != nil {
@@ -338,8 +352,10 @@ func (w indentWriter) WriteString(p string) error {
 		if _, err := w.w.Write(scanner.Bytes()); err != nil {
 			return err
 		}
-		if _, err := io.WriteString(w.w, "\n"); err != nil {
-			return err
+		if !skipNewline {
+			if _, err := io.WriteString(w.w, "\n"); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

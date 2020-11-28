@@ -1,8 +1,7 @@
+// +build never
 // +build !analyze
 
 package example
-
-//go:generate sh -c "go run ../cmd/gofmts < example.go > example_expected.go"
 
 //gofmts:sql
 const Sql = `

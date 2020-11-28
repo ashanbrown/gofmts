@@ -7,6 +7,7 @@ import (
 	"go/format"
 	"go/printer"
 	"go/token"
+	"log"
 	"sort"
 	"strings"
 
@@ -242,14 +243,46 @@ func (v *sortVisitor) Visit(node dst.Node) dst.Visitor {
 		return nil // skip children now that we have a sort group
 	}
 
-	// node is not part of group, so close the group
-	if node.Decorations().Before != dst.NewLine {
+	log.Printf("node position: %v %v\n%v",
+		v.fset.Position(v.decorator.Ast.Nodes[node].Pos()),
+		v.fset.Position(v.decorator.Ast.Nodes[node].End()),
+		node,
+	)
+
+	groupEndLine := v.fset.Position(v.activeSortGroup.endPos(v.decorator)).Line
+
+	// node is not part of group, so close the old group
+	if node.Decorations().Before == dst.EmptyLine || v.calculateNodeStartLine(node) > groupEndLine+1 {
 		v.activeSortGroup = nil
 		return v // walk children
 	}
 
 	v.activeSortGroup.nodes = append(v.activeSortGroup.nodes, node)
+
+	// next node is not part of group, so close the group
+	if node.Decorations().After == dst.EmptyLine {
+		v.activeSortGroup = nil
+	}
+
 	return nil // skip children since this node and its children are in current group
+}
+
+func (v *sortVisitor) calculateNodeStartLine(node dst.Node) int {
+	astNode := v.decorator.Ast.Nodes[node]
+	nodeStartLine := v.fset.Position(astNode.Pos()).Line
+	if node.Decorations().Before == dst.EmptyLine {
+		nodeStartLine++
+	}
+	start := node.Decorations().Start
+	for i := len(start) - 1; i >= 0; i-- {
+		dec := start[i]
+		// allow double slashes to remain part of the group
+		if strings.HasPrefix(dec, "//") {
+			nodeStartLine--
+			break
+		}
+	}
+	return nodeStartLine
 }
 
 type sortNodesLexicographically struct {
