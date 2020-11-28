@@ -1,3 +1,9 @@
 run:
   build-tags:
     - analyze
+
+issues:
+  exclude-rules:
+    - path: cmd/gofmts/gofmt.go
+      linters:
+        - errcheck

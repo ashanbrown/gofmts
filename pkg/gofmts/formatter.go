@@ -10,10 +10,12 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/dave/dst"
+	"github.com/dave/dst/decorator"
+	"github.com/dave/dst/dstutil"
 	"github.com/jackc/sqlfmt"
 	"github.com/pkg/errors"
 	"github.com/tidwall/pretty"
-	"golang.org/x/tools/go/ast/astutil"
 )
 
 type Issue interface {
@@ -111,15 +113,16 @@ func (i FailedDirective) Position() token.Position {
 func (i FailedDirective) String() string { return toString(i) }
 
 type visitor struct {
+	decorator       *decorator.Decorator
 	directivesByPos map[token.Pos]string
 	fset            *token.FileSet
 	issues          []Issue
-	issuesByPos     map[token.Pos]Issue
+	issuesByNode    map[dst.Node]Issue
 }
 
-func Rewrite(fset *token.FileSet, nodes ...ast.Node) error {
+func Rewrite(fset *token.FileSet, files ...*ast.File) error {
 	f := Formatter{}
-	issues, err := f.Run(fset, nodes...)
+	issues, err := f.Run(fset, files...)
 	if err != nil {
 		return err
 	}
@@ -132,60 +135,69 @@ func Rewrite(fset *token.FileSet, nodes ...ast.Node) error {
 }
 
 // nodes may be modified by this method
-func (f *Formatter) Run(fset *token.FileSet, nodes ...ast.Node) ([]Issue, error) {
+func (f *Formatter) Run(fset *token.FileSet, files ...*ast.File) ([]Issue, error) {
 	var issues []Issue // nolint:prealloc // don't know how many there will be
-	for _, node := range nodes {
+	for _, file := range files {
+		dcrtr := decorator.NewDecorator(fset)
+		dstFile, err := dcrtr.DecorateFile(file)
+		if err != nil {
+			return nil, errors.Wrapf(err, "decorate failed")
+		}
+
 		directivesByPos := make(map[token.Pos]string) // nolint:prealloc // don't know how many there will be
-		issuesByPos := make(map[token.Pos]Issue)      // nolint:prealloc // don't know how many there will be
-		switch node := node.(type) {
-		case *ast.File:
-			for _, group := range node.Comments {
-				for _, comment := range group.List {
-					if comment.Text[1] == '*' { // only allow directives on //-style comments
+		issuesByNode := make(map[dst.Node]Issue)      // nolint:prealloc // don't know how many there will be
+		for _, group := range file.Comments {
+			for _, comment := range group.List {
+				if comment.Text[1] == '*' { // only allow directives on //-style comments
+					continue
+				}
+
+				if strings.HasPrefix(comment.Text[2:], directivePrefix) {
+					// ignore sort directives
+					if strings.HasPrefix(comment.Text[2:], directivePrefix+"sort") {
 						continue
 					}
-
-					if strings.HasPrefix(comment.Text[2:], directivePrefix) {
-						// ignore sort directives
-						if strings.HasPrefix(comment.Text[2:], directivePrefix+"sort") {
-							continue
-						}
-						parts := strings.SplitN(comment.Text[2:], ":", 2)
-						directivesByPos[comment.End()] = strings.TrimRightFunc(parts[1], unicode.IsSpace)
-					}
+					parts := strings.SplitN(comment.Text[2:], ":", 2)
+					directivesByPos[comment.End()] = strings.TrimRightFunc(parts[1], unicode.IsSpace)
 				}
 			}
 		}
 		visitor := visitor{
+			decorator:       dcrtr,
 			directivesByPos: directivesByPos,
-			issuesByPos:     issuesByPos,
+			issuesByNode:    issuesByNode,
 			fset:            fset,
 		}
-		ast.Walk(&visitor, node)
+		dst.Walk(&visitor, dstFile)
 		issues = append(issues, visitor.issues...)
 		for pos, d := range directivesByPos {
 			issues = append(issues, UnusedDirective{name: d, position: fset.Position(pos)})
 		}
 
 		// apply replacements
-		astutil.Apply(node, nil, func(c *astutil.Cursor) bool {
+		dstutil.Apply(dstFile, nil, func(c *dstutil.Cursor) bool {
 			switch node := c.Node().(type) {
-			case *ast.BasicLit:
-				issue, exists := issuesByPos[node.Pos()].(IssueWithReplacement)
+			case *dst.BasicLit:
+				issue, exists := issuesByNode[c.Node()].(IssueWithReplacement)
 				if !exists {
 					break
 				}
-				replacementNode := &ast.BasicLit{
-					Kind:  token.STRING,
-					Value: issue.Replacement(),
-				}
+				replacementNode := dst.Clone(node).(*dst.BasicLit)
+				replacementNode.Value = issue.Replacement()
 				c.Replace(replacementNode)
 			}
 			return true
 		})
 
+		restorer := decorator.NewRestorer()
+		restorer.Fset = fset
+		af, err := restorer.RestoreFile(dstFile)
+		if err != nil {
+			return nil, errors.Wrapf(err, "unable to reformat node")
+		}
+		*file = *af
 		srtr := Sorter{}
-		sortIssues, err := srtr.run(fset, node)
+		sortIssues, err := srtr.run(fset, file)
 		if err != nil {
 			return nil, errors.Wrapf(err, "sort failed")
 		}
@@ -194,12 +206,13 @@ func (f *Formatter) Run(fset *token.FileSet, nodes ...ast.Node) ([]Issue, error)
 	return issues, nil
 }
 
-func (v *visitor) Visit(node ast.Node) ast.Visitor {
+func (v *visitor) Visit(node dst.Node) dst.Visitor {
 ParseNode:
 	switch node := node.(type) {
-	case *ast.BasicLit:
+	case *dst.BasicLit:
 		if node.Kind == token.STRING {
-			closestDirectivePos, closestDirective := findClosestDirective(v.fset, v.directivesByPos, node, false)
+			astNode := v.decorator.Ast.Nodes[node]
+			closestDirectivePos, closestDirective := findClosestDirective(v.fset, v.directivesByPos, astNode, false)
 			if !closestDirectivePos.IsValid() {
 				break
 			}
@@ -230,9 +243,9 @@ ParseNode:
 
 			var replacementBuf bytes.Buffer
 			replacementBuf.WriteByte(node.Value[0])
-			isMultiline := strings.Contains(newValue, "\n") || v.fset.Position(node.Pos()).Line != v.fset.Position(node.End()).Line
+			isMultiline := strings.Contains(newValue, "\n") || v.fset.Position(astNode.Pos()).Line != v.fset.Position(astNode.End()).Line
 			if isMultiline {
-				indentColumn := v.fset.Position(node.Pos()).Column
+				indentColumn := v.fset.Position(astNode.Pos()).Column
 				indent := strings.Repeat("\t", indentColumn/8) + strings.Repeat(" ", indentColumn%8)
 				_, _ = replacementBuf.WriteString("\n")
 				lines := strings.Split(newValue, "\n")
@@ -249,11 +262,11 @@ ParseNode:
 			replacementBuf.WriteByte(node.Value[len(node.Value)-1])
 			issue := FormatIssue{
 				directive:   closestDirective,
-				position:    v.fset.Position(node.Pos()),
-				end:         v.fset.Position(node.End()),
+				position:    v.fset.Position(astNode.Pos()),
+				end:         v.fset.Position(astNode.End()),
 				replacement: replacementBuf.String(),
 			}
-			v.issuesByPos[node.Pos()] = issue
+			v.issuesByNode[node] = issue
 			v.issues = append(v.issues, issue)
 		}
 	}

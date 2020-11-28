@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"go/ast"
+	"go/format"
 	"go/printer"
 	"go/token"
 	"sort"
@@ -46,7 +47,6 @@ type sortGroup struct {
 	directive    string
 	directivePos token.Pos
 	nodes        []dst.Node
-	closed       bool
 }
 
 func (g *sortGroup) endPos(dcrtr *decorator.Decorator) token.Pos {
@@ -65,25 +65,21 @@ type sortVisitor struct {
 	directivesByPos map[token.Pos]string
 	sortGroups      []*sortGroup
 	fset            *token.FileSet
-	issues          []Issue
 	activeSortGroup *sortGroup
 }
 
 // nodes may be modified by this method
-func (s *Sorter) run(fset *token.FileSet, nodes ...ast.Node) (issues []Issue, _ error) {
-	for _, node := range nodes {
+func (s *Sorter) run(fset *token.FileSet, files ...*ast.File) (issues []Issue, _ error) {
+	for _, file := range files {
 		directivesByPos := make(map[token.Pos]string) // nolint:prealloc // don't know how many there will be
-		switch node := node.(type) {
-		case *ast.File:
-			for _, group := range node.Comments {
-				for _, comment := range group.List {
-					if comment.Text[1] == '*' { // only allow directives on //-style comments
-						continue
-					}
+		for _, group := range file.Comments {
+			for _, comment := range group.List {
+				if comment.Text[1] == '*' { // only allow directives on //-style comments
+					continue
+				}
 
-					if strings.HasPrefix(comment.Text[2:], directivePrefix+"sort") {
-						directivesByPos[comment.End()] = "sort"
-					}
+				if strings.HasPrefix(comment.Text[2:], directivePrefix+"sort") {
+					directivesByPos[comment.End()] = "sort"
 				}
 			}
 		}
@@ -96,7 +92,7 @@ func (s *Sorter) run(fset *token.FileSet, nodes ...ast.Node) (issues []Issue, _ 
 			directivesByPos: directivesByPos,
 			fset:            fset,
 		}
-		dstFile, err := dcrtr.DecorateFile(node.(*ast.File))
+		dstFile, err := dcrtr.DecorateFile(file)
 		if err != nil {
 			return nil, errors.Wrapf(err, "decorate failed")
 		}
@@ -156,12 +152,11 @@ func (s *Sorter) run(fset *token.FileSet, nodes ...ast.Node) (issues []Issue, _ 
 			if err != nil {
 				return nil, errors.Wrap(err, "dst restore failed")
 			}
-			*node.(*ast.File) = *af
+			*file = *af
 
 			if !s.skipReplacements {
 				fbuf := new(bytes.Buffer)
-				err := printer.Fprint(fbuf, restorer.Fset, node.(*ast.File))
-				//err := format.Node(fbuf, restorer.Fset, node.(*ast.File))
+				err := format.Node(fbuf, restorer.Fset, file)
 				if err != nil {
 					return nil, errors.Wrap(err, "dst restore failed")
 				}
