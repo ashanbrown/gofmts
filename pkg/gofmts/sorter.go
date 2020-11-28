@@ -7,7 +7,6 @@ import (
 	"go/format"
 	"go/printer"
 	"go/token"
-	"log"
 	"sort"
 	"strings"
 
@@ -242,12 +241,6 @@ func (v *sortVisitor) Visit(node dst.Node) dst.Visitor {
 		delete(v.directivesByPos, directivePos)
 		return nil // skip children now that we have a sort group
 	}
-
-	log.Printf("node position: %v %v\n%v",
-		v.fset.Position(v.decorator.Ast.Nodes[node].Pos()),
-		v.fset.Position(v.decorator.Ast.Nodes[node].End()),
-		node,
-	)
 
 	groupEndLine := v.fset.Position(v.activeSortGroup.endPos(v.decorator)).Line
 
