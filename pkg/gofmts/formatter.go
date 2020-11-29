@@ -45,10 +45,10 @@ func NewFormatter() *Formatter {
 	return &Formatter{}
 }
 
-func FormatFile(fset *token.FileSet, file *ast.File) ([]Issue, error) {
+func FormatFile(src []byte, fset *token.FileSet, file *ast.File) ([]Issue, error) {
 	fmtr := NewFormatter()
 	fmtr.applyReplacements = true
-	return fmtr.Run(fset, file)
+	return fmtr.Run(src, fset, file)
 }
 
 type FormatIssue struct {
@@ -131,71 +131,72 @@ type formatVisitor struct {
 	issues          []Issue
 	issuesByNode    map[dst.Node]Issue
 	prevNode        dst.Node
+	src             []byte
 }
 
-func (f *Formatter) Run(fset *token.FileSet, files ...*ast.File) ([]Issue, error) {
+func (f *Formatter) Run(src []byte, fset *token.FileSet, file *ast.File) ([]Issue, error) {
 	var issues []Issue // nolint:prealloc // don't know how many there will be
-	for _, file := range files {
-		dcrtr := decorator.NewDecorator(fset)
-		dstFile, err := dcrtr.DecorateFile(file)
-		if err != nil {
-			return nil, errors.Wrapf(err, "decorate failed")
-		}
+	dcrtr := decorator.NewDecorator(fset)
+	dstFile, err := dcrtr.DecorateFile(file)
+	if err != nil {
+		return nil, errors.Wrapf(err, "decorate failed")
+	}
 
-		directivesByPos := make(map[token.Pos]string) // nolint:prealloc // don't know how many there will be
-		issuesByNode := make(map[dst.Node]Issue)      // nolint:prealloc // don't know how many there will be
-		for _, group := range file.Comments {
-			for _, comment := range group.List {
-				if comment.Text[1] == '*' { // only allow directives on //-style comments
+	directivesByPos := make(map[token.Pos]string) // nolint:prealloc // don't know how many there will be
+	issuesByNode := make(map[dst.Node]Issue)      // nolint:prealloc // don't know how many there will be
+	for _, group := range file.Comments {
+		for _, comment := range group.List {
+			if comment.Text[1] == '*' { // only allow directives on //-style comments
+				continue
+			}
+
+			if strings.HasPrefix(comment.Text[2:], directivePrefix) {
+				// ignore sort directives
+				if strings.HasPrefix(comment.Text[2:], directivePrefix+"sort") {
 					continue
 				}
-
-				if strings.HasPrefix(comment.Text[2:], directivePrefix) {
-					// ignore sort directives
-					if strings.HasPrefix(comment.Text[2:], directivePrefix+"sort") {
-						continue
-					}
-					parts := strings.SplitN(comment.Text[2:], ":", 2)
-					directivesByPos[comment.End()] = strings.TrimRightFunc(parts[1], unicode.IsSpace)
-				}
+				parts := strings.SplitN(comment.Text[2:], ":", 2)
+				directivesByPos[comment.End()] = strings.TrimRightFunc(parts[1], unicode.IsSpace)
 			}
 		}
-		visitor := formatVisitor{
-			decorator:       dcrtr,
-			directivesByPos: directivesByPos,
-			issuesByNode:    issuesByNode,
-			fset:            fset,
-		}
-		dst.Walk(&visitor, dstFile)
-		issues = append(issues, visitor.issues...)
-		for pos, d := range directivesByPos {
-			issues = append(issues, UnusedDirective{name: d, position: fset.Position(pos)})
-		}
+	}
+	visitor := formatVisitor{
+		//gofmts:sort
+		decorator:       dcrtr,
+		directivesByPos: directivesByPos,
+		fset:            fset,
+		issuesByNode:    issuesByNode,
+		src:             src,
+	}
+	dst.Walk(&visitor, dstFile)
+	issues = append(issues, visitor.issues...)
+	for pos, d := range directivesByPos {
+		issues = append(issues, UnusedDirective{name: d, position: fset.Position(pos)})
+	}
 
-		// apply replacements
-		if f.applyReplacements && len(visitor.issues) > 0 {
-			dstutil.Apply(dstFile, nil, func(c *dstutil.Cursor) bool {
-				switch node := c.Node().(type) {
-				case *dst.BasicLit:
-					issue, exists := issuesByNode[c.Node()].(IssueWithReplacement)
-					if !exists {
-						break
-					}
-					replacementNode := dst.Clone(node).(*dst.BasicLit)
-					replacementNode.Value = issue.Replacement()
-					c.Replace(replacementNode)
+	// apply replacements
+	if f.applyReplacements && len(visitor.issues) > 0 {
+		dstutil.Apply(dstFile, nil, func(c *dstutil.Cursor) bool {
+			switch node := c.Node().(type) {
+			case *dst.BasicLit:
+				issue, exists := issuesByNode[c.Node()].(IssueWithReplacement)
+				if !exists {
+					break
 				}
-				return true
-			})
-
-			restorer := decorator.NewRestorer()
-			restorer.Fset = fset
-			af, err := restorer.RestoreFile(dstFile)
-			if err != nil {
-				return nil, errors.Wrapf(err, "unable to reformat node")
+				replacementNode := dst.Clone(node).(*dst.BasicLit)
+				replacementNode.Value = issue.Replacement()
+				c.Replace(replacementNode)
 			}
-			*file = *af
+			return true
+		})
+
+		restorer := decorator.NewRestorer()
+		restorer.Fset = fset
+		af, err := restorer.RestoreFile(dstFile)
+		if err != nil {
+			return nil, errors.Wrapf(err, "unable to reformat node")
 		}
+		*file = *af
 	}
 	return issues, nil
 }
@@ -256,17 +257,24 @@ ParseNode:
 				// start a new line so that tabs and spaces line up (because not all editors use the same tab width)
 				_, _ = io.WriteString(replacementBuf, "\n")
 
-				// if we're on a new line, assume that we're indented with tabs
-				assumeTabs := false
-				if position.Line != v.fset.Position(v.decorator.Ast.Nodes[v.prevNode].Pos()).Line {
-					assumeTabs = true
-				}
+				// determine the indentation of each string
+				position := v.fset.Position(astNode.Pos())
+				columnByteOffset := position.Column
+				indentSpaces := columnByteOffset // by default assume, everything take a character
 
-				// the indent column is basically a WAG because we don't know what's a tab and what's a space
-				columnByteOffset := v.fset.Position(astNode.Pos()).Column
-				indentSpaces := columnByteOffset
-				if assumeTabs {
-					indentSpaces = columnByteOffset*tabWidth + 1
+				// if we have the source data, start at the next tab stop
+				if v.src != nil {
+					spaces := countSpaces(string(v.src[position.Offset-position.Column : position.Offset]))
+					indentSpaces = ((spaces / tabWidth) + 1) * tabWidth
+				} else {
+
+					// otherwise, if we're on a new line, assume that we should use tabs to indent
+					if position.Line != v.fset.Position(v.decorator.Ast.Nodes[v.prevNode].Pos()).Line {
+						indentSpaces = columnByteOffset * tabWidth
+					}
+
+					// indent by a tab width from the quotation mark
+					indentSpaces += tabWidth
 				}
 
 				iw := NewIndentWriter(replacementBuf, indentSpaces, tabWidth /* tab width */)
@@ -377,4 +385,15 @@ func (w indentWriter) WriteString(p string, skipNewline bool) error {
 		}
 	}
 	return nil
+}
+
+func countSpaces(str string) (count int) {
+	for _, char := range str {
+		if char == '\t' {
+			count += tabWidth
+		} else {
+			count++
+		}
+	}
+	return count
 }

@@ -14,14 +14,14 @@ import (
 )
 
 func TestFormatter(t *testing.T) {
-	makeInputs := func(t *testing.T, src string) (*token.FileSet, *ast.File) {
+	makeInputs := func(t *testing.T, src string) ([]byte, *token.FileSet, *ast.File) {
 		fset := token.NewFileSet()
 		src = strings.TrimLeftFunc(src, unicode.IsSpace)
 		formatted, err := format.Source([]byte(src))
 		require.NoError(t, err)
 		f, err := parser.ParseFile(fset, "", string(formatted), parser.ParseComments)
 		require.NoError(t, err)
-		return fset, f
+		return formatted, fset, f
 	}
 
 	fmtr := NewFormatter()
@@ -37,7 +37,7 @@ func TestFormatter(t *testing.T) {
 		assert.Equal(t, "json formatting differs", issues[0].Details())
 		assert.Equal(t, 4, issues[0].Position().Line)
 		require.Implements(t, (*IssueWithReplacement)(nil), issues[0])
-		assert.Equal(t, "`\n\t      {\n\t        \"a\": 1\n\t      }\n\t      `",
+		assert.Equal(t, "`\n\t\t{\n\t\t  \"a\": 1\n\t\t}\n\t\t`",
 			issues[0].(IssueWithReplacement).Replacement())
 	})
 
@@ -51,7 +51,7 @@ func TestFormatter(t *testing.T) {
 		assert.Equal(t, "json formatting differs", issues[0].Details())
 		assert.Equal(t, 3, issues[0].Position().Line)
 		require.Implements(t, (*IssueWithReplacement)(nil), issues[0])
-		assert.Equal(t, "`\n\t      {\n\t        \"a\": 1\n\t      }\n\t      `",
+		assert.Equal(t, "`\n\t\t{\n\t\t  \"a\": 1\n\t\t}\n\t\t`",
 			issues[0].(IssueWithReplacement).Replacement())
 	})
 
@@ -67,7 +67,7 @@ func TestFormatter(t *testing.T) {
 		assert.Equal(t, "json formatting differs", issues[0].Details())
 		assert.Equal(t, 5, issues[0].Position().Line)
 		require.Implements(t, (*IssueWithReplacement)(nil), issues[0])
-		assert.Equal(t, "`\n\t\t [1]\n\t\t `", issues[0].(IssueWithReplacement).Replacement())
+		assert.Equal(t, "`\n\t\t[1]\n\t\t`", issues[0].(IssueWithReplacement).Replacement())
 	})
 
 	t.Run("json directive for invalid json generates an error", func(t *testing.T) {
@@ -86,11 +86,11 @@ func TestFormatter(t *testing.T) {
 		issues, err := fmtr.Run(makeInputs(t,
 			//gofmts:go
 			`
-				 package main
-				 
-				 //gofmts:sql
-				 const sql = "SELECT * FROM mytable"
-				 `))
+				package main
+				
+				//gofmts:sql
+				const sql = "SELECT * FROM mytable"
+				`))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, `failed directive "sql": reformatted string will be multiline and must be quoted using backticks`, issues[0].Details())
@@ -108,7 +108,8 @@ func TestFormatter(t *testing.T) {
 		assert.Equal(t, "sql formatting differs", issues[0].Details())
 		assert.Equal(t, 4, issues[0].Position().Line)
 		require.Implements(t, (*IssueWithReplacement)(nil), issues[0])
-		assert.Equal(t, "`\n\t     SELECT\n\t       *\n\t     FROM\n\t       mytable\n\t     `", issues[0].(IssueWithReplacement).Replacement())
+		assert.Equal(t, "`\n\t\tSELECT\n\t\t  *\n\t\tFROM\n\t\t  mytable\n\t\t`",
+			issues[0].(IssueWithReplacement).Replacement())
 	})
 
 	t.Run("sql on line boundary uses tabs for indenting", func(t *testing.T) {
@@ -123,18 +124,19 @@ func TestFormatter(t *testing.T) {
 		assert.Equal(t, "sql formatting differs", issues[0].Details())
 		assert.Equal(t, 5, issues[0].Position().Line)
 		require.Implements(t, (*IssueWithReplacement)(nil), issues[0])
-		assert.Equal(t, "`\n\t\t SELECT\n\t\t   *\n\t\t FROM\n\t\t   mytable\n\t\t `", issues[0].(IssueWithReplacement).Replacement())
+		assert.Equal(t, "`\n\t\tSELECT\n\t\t  *\n\t\tFROM\n\t\t  mytable\n\t\t`",
+			issues[0].(IssueWithReplacement).Replacement())
 	})
 
 	t.Run("an unknown directive generates an error", func(t *testing.T) {
 		//gofmts:go
 		issues, err := fmtr.Run(makeInputs(t,
 			`
-				 package main
-				 
-				 //gofmts:unknown
-				 const value = ""
-				 `))
+				package main
+				
+				//gofmts:unknown
+				const value = ""
+				`))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "unknown directive `gofmts:unknown`", issues[0].Details())
@@ -145,10 +147,10 @@ func TestFormatter(t *testing.T) {
 		issues, err := fmtr.Run(makeInputs(t,
 			//gofmts:go
 			`
-				 package main
-				 
-				 //gofmts:sql
-				 `))
+				package main
+				
+				//gofmts:sql
+				`))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "unused directive `gofmts:sql`", issues[0].Details())
@@ -159,11 +161,11 @@ func TestFormatter(t *testing.T) {
 		issues, err := fmtr.Run(makeInputs(t,
 			//gofmts:go
 			`
-				 package main
-				 
-				 //gofmts:go
-				 const expr = "1  + 2"
-				 `))
+				package main
+				
+				//gofmts:go
+				const expr = "1  + 2"
+				`))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "go formatting differs", issues[0].Details())
@@ -176,11 +178,11 @@ func TestFormatter(t *testing.T) {
 		issues, err := fmtr.Run(makeInputs(t,
 			//gofmts:go
 			`
-				 package main
-				 
-				 //gofmts:go
-				 const expr = "1 +"
-				 `))
+				package main
+				
+				//gofmts:go
+				const expr = "1 +"
+				`))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, `failed directive "go": unable to format go code: 3:1: expected operand, found '}'`,

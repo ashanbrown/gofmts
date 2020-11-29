@@ -10,8 +10,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-func reformatFile(file *ast.File) error {
-	if err := handleIssues(gofmts.FormatFile(fileSet, file)); err != nil {
+func reformatFile(src []byte, file *ast.File) error {
+	if err := handleIssues(gofmts.FormatFile(src, fileSet, file)); err != nil {
 		return err
 	}
 	return nil

@@ -158,7 +158,7 @@ func processFile(filename string, in io.Reader, out io.Writer, stdin bool) error
 		return err
 	}
 
-	err = reformatFile(file)
+	err = reformatFile(src, file)
 	if err != nil {
 		return err
 	}

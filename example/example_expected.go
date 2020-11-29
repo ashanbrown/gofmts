@@ -5,20 +5,20 @@ package example
 
 //gofmts:sql
 const Sql = `
-	     SELECT
-	       *
-	     FROM
-	       mytable
-	     `
+		SELECT
+		  *
+		FROM
+		  mytable
+		`
 
 //gofmts:json
 const Json = `
-	      {
-	        "a": 1,
-	        "b": 2,
-	        "c": [1, 2, 3]
-	      }
-	      `
+		{
+		  "a": 1,
+		  "b": 2,
+		  "c": [1, 2, 3]
+		}
+		`
 
 //gofmts:sort
 const A = 2

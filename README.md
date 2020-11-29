@@ -68,8 +68,6 @@ Right now `gofmts` is more interested in being opinionated than being pretty.  P
 1. We have to rewrite from the AST to generate the replacement text.  This could potentially lead to surprises if the generated code isn't identical to the input code.  Code run through gofmt first should generally be rewritten the same as it arrived.
 2. For sorting, we sort AST nodes, assuming one per line.  In the future, we might be able to sort other list of nodes such as slices that fit within a line.
 
-Note that because the `gofmts` library currently does not inspect the original source, the indentations for reformatted multiline strings are determined by a heuristic based on whether the string opening quotation mark is the first thing in a line.  This kind of works because generally a quotation mark on its own line is preceded by tabs, and when on other lines it is mostly preceded by other characters.
-
 `gofmts` is written as a linter that returns issues so that it can one day be added as a linter/fixer combination to `golangci-lint`.
 
 ## Future plans
