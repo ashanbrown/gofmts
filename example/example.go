@@ -3,12 +3,12 @@
 package example
 
 //gofmts:sql
-const Sql = `SELECT *
-FROM
-     mytable `
+const Sql = `
+SELECT * FROM mytable `
 
 //gofmts:json
-const Json = `{"a":  1, "b":2, "c": [1, 2, 3]}`
+const Json = `
+{"a":  1, "b":2, "c": [1, 2, 3]}`
 
 //gofmts:sort
 const Z = 1

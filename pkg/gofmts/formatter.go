@@ -21,6 +21,8 @@ import (
 	"github.com/tidwall/pretty"
 )
 
+const tabWidth = 8
+
 type Issue interface {
 	Details() string
 	Position() token.Position
@@ -122,12 +124,13 @@ func (i FailedDirective) Position() token.Position {
 
 func (i FailedDirective) String() string { return toString(i) }
 
-type visitor struct {
+type formatVisitor struct {
 	decorator       *decorator.Decorator
 	directivesByPos map[token.Pos]string
 	fset            *token.FileSet
 	issues          []Issue
 	issuesByNode    map[dst.Node]Issue
+	prevNode        dst.Node
 }
 
 func (f *Formatter) Run(fset *token.FileSet, files ...*ast.File) ([]Issue, error) {
@@ -157,7 +160,7 @@ func (f *Formatter) Run(fset *token.FileSet, files ...*ast.File) ([]Issue, error
 				}
 			}
 		}
-		visitor := visitor{
+		visitor := formatVisitor{
 			decorator:       dcrtr,
 			directivesByPos: directivesByPos,
 			issuesByNode:    issuesByNode,
@@ -197,7 +200,7 @@ func (f *Formatter) Run(fset *token.FileSet, files ...*ast.File) ([]Issue, error
 	return issues, nil
 }
 
-func (v *visitor) Visit(node dst.Node) dst.Visitor {
+func (v *formatVisitor) Visit(node dst.Node) dst.Visitor {
 ParseNode:
 	switch node := node.(type) {
 	case *dst.BasicLit:
@@ -245,16 +248,28 @@ ParseNode:
 				break
 			}
 
+			position := v.fset.Position(astNode.Pos())
+
 			replacementBuf := new(bytes.Buffer)
 			_, _ = io.WriteString(replacementBuf, node.Value[0:1])
 			if isMultiline {
 				// start a new line so that tabs and spaces line up (because not all editors use the same tab width)
 				_, _ = io.WriteString(replacementBuf, "\n")
 
-				// the indent column is basically a WAG because we don't know what's a tab and what's a space
-				indentColumn := v.fset.Position(astNode.Pos()).Column
+				// if we're on a new line, assume that we're indented with tabs
+				assumeTabs := false
+				if position.Line != v.fset.Position(v.decorator.Ast.Nodes[v.prevNode].Pos()).Line {
+					assumeTabs = true
+				}
 
-				iw := NewIndentWriter(replacementBuf, indentColumn, 8 /* tab width */)
+				// the indent column is basically a WAG because we don't know what's a tab and what's a space
+				columnByteOffset := v.fset.Position(astNode.Pos()).Column
+				indentSpaces := columnByteOffset
+				if assumeTabs {
+					indentSpaces = columnByteOffset*tabWidth + 1
+				}
+
+				iw := NewIndentWriter(replacementBuf, indentSpaces, tabWidth /* tab width */)
 				_ = iw.WriteString(newValue, false)
 				_ = iw.WriteString(node.Value[len(node.Value)-1:], true)
 			} else {
@@ -269,13 +284,16 @@ ParseNode:
 
 			issue := FormatIssue{
 				directive:   closestDirective,
-				position:    v.fset.Position(astNode.Pos()),
+				position:    position,
 				end:         v.fset.Position(astNode.End()),
 				replacement: replacementBuf.String(),
 			}
 			v.issuesByNode[node] = issue
 			v.issues = append(v.issues, issue)
 		}
+	}
+	if node != nil {
+		v.prevNode = node
 	}
 	return v
 }

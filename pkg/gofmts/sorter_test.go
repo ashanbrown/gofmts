@@ -26,16 +26,17 @@ func TestSorter(t *testing.T) {
 	srtr := Sorter{}
 
 	t.Run("previous directive", func(t *testing.T) {
-		//gofmts:go
-		issues, err := srtr.Run(makeInputs(t, `
-					 package main
-					 
-					 const (
-					 	//gofmts:sort
-					 	Z = 2
-					 	A = 1
-					 )
-					 `))
+		issues, err := srtr.Run(makeInputs(t,
+			//gofmts:go
+			`
+				 package main
+				 
+				 const (
+				 	//gofmts:sort
+				 	Z = 2
+				 	A = 1
+				 )
+				 `))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "block is unsorted", issues[0].Details())
@@ -45,17 +46,18 @@ func TestSorter(t *testing.T) {
 	})
 
 	t.Run("it drags comments around with anything that moves", func(t *testing.T) {
-		//gofmts:go
-		issues, err := srtr.Run(makeInputs(t, `
-					 package main
-					 
-					 const (
-					 	//gofmts:sort
-					 	Z = 2
-					 	// B = 1
-					 	A = 1
-					 )
-					 `))
+		issues, err := srtr.Run(makeInputs(t,
+			//gofmts:go
+			`
+				 package main
+				 
+				 const (
+				 	//gofmts:sort
+				 	Z = 2
+				 	// B = 1
+				 	A = 1
+				 )
+				 `))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "block is unsorted", issues[0].Details())
@@ -66,17 +68,18 @@ func TestSorter(t *testing.T) {
 	})
 
 	t.Run("it works with a comment after the directive", func(t *testing.T) {
-		//gofmts:go
-		issues, err := srtr.Run(makeInputs(t, `
-					 package main
-					 
-					 const (
-					 	//gofmts:sort
-					 	// B = 1
-					 	Z = 2
-					 	A = 1
-					 )
-					 `))
+		issues, err := srtr.Run(makeInputs(t,
+			//gofmts:go
+			`
+				 package main
+				 
+				 const (
+				 	//gofmts:sort
+				 	// B = 1
+				 	Z = 2
+				 	A = 1
+				 )
+				 `))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "block is unsorted", issues[0].Details())
@@ -87,16 +90,17 @@ func TestSorter(t *testing.T) {
 	})
 
 	t.Run("it works with top-level const", func(t *testing.T) {
-		//gofmts:go
-		issues, err := srtr.Run(makeInputs(t, `
-					 package main
-					 
-					 //gofmts:sort
-					 const Z = 1
-					 const A = 2
-					 
-					 const B = 3
-					 `))
+		issues, err := srtr.Run(makeInputs(t,
+			//gofmts:go
+			`
+				 package main
+				 
+				 //gofmts:sort
+				 const Z = 1
+				 const A = 2
+				 
+				 const B = 3
+				 `))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "block is unsorted", issues[0].Details())
@@ -107,18 +111,19 @@ func TestSorter(t *testing.T) {
 	})
 
 	t.Run("it fails back-to-back with unused directive", func(t *testing.T) {
-		//gofmts:go
-		issues, err := srtr.Run(makeInputs(t, `
-					 package main
-					 
-					 //gofmts:sort
-					 const Z = 1
-					 const A = 2
-					 
-					 //gofmts:sort
-					 const Y = 1
-					 const B = 2
-					 `))
+		issues, err := srtr.Run(makeInputs(t,
+			//gofmts:go
+			`
+				 package main
+				 
+				 //gofmts:sort
+				 const Z = 1
+				 const A = 2
+				 
+				 //gofmts:sort
+				 const Y = 1
+				 const B = 2
+				 `))
 		require.NoError(t, err)
 		require.Len(t, issues, 2)
 		assert.Equal(t, "block is unsorted", issues[0].Details())
@@ -130,12 +135,13 @@ func TestSorter(t *testing.T) {
 	})
 
 	t.Run("unused directive", func(t *testing.T) {
-		//gofmts:go
-		issues, err := srtr.Run(makeInputs(t, `
-					 package main
-					 
-					 //gofmts:sort
-					 `))
+		issues, err := srtr.Run(makeInputs(t,
+			//gofmts:go
+			`
+				 package main
+				 
+				 //gofmts:sort
+				 `))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "unused directive `gofmts:sort`", issues[0].Details())
@@ -143,14 +149,15 @@ func TestSorter(t *testing.T) {
 	})
 
 	t.Run("unused directive due to whitespace", func(t *testing.T) {
-		//gofmts:go
-		issues, err := srtr.Run(makeInputs(t, `
-					 package main
-					 
-					 //gofmts:sort
-					 
-					 const A = 1
-					 `))
+		issues, err := srtr.Run(makeInputs(t,
+			//gofmts:go
+			`
+				 package main
+				 
+				 //gofmts:sort
+				 
+				 const A = 1
+				 `))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "unused directive `gofmts:sort`", issues[0].Details())
