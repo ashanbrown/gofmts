@@ -53,7 +53,14 @@ You can run `gofmts` on specific files as part of your `generate` step:
 
     //go:generate gofmts -w $GOFILE
 
-You can also run it on all your files via your pre-commit hooks.
+You can also run it on all your files via your pre-commit.com pre-commit hooks by putting this in your `.pre-commit-config.yaml`:
+
+```
+   - repo: github.com/ashanbrown/gofmts
+     rev: v0.1.2
+     hooks:
+        - id: gofmts-docker
+```
 
 ## Notes
 
