@@ -1,5 +1,7 @@
 # gofmts formats strings in go code
 
+![Test](https://github.com/actions/ashanbrown/gofmts/.github/workflows/test.yml/badge.svg)
+
 `gofmts` allows you to be opinionated about the format of strings and ordering of lines in your go source code.
 
 **What can you do with `gofmts`?**
