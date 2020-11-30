@@ -4,8 +4,8 @@
   entry: gofmts -l -w
   types: [go]
 
-#- id: gofmts-docker
-#  name: gofmts
-#  language: docker_image
-#  entry: "ghcr.io/ashanbrown/gofmts:latest"
-#  types: [go]
+- id: gofmts-docker
+  name: gofmts
+  language: docker_image
+  entry: "ghcr.io/ashanbrown/gofmts:latest"
+  types: [go]
