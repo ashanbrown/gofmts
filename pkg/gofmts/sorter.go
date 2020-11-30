@@ -7,6 +7,7 @@ import (
 	"go/format"
 	"go/printer"
 	"go/token"
+	"math/big"
 	"sort"
 	"strings"
 
@@ -115,7 +116,7 @@ func (s *Sorter) Run(fset *token.FileSet, files ...*ast.File) (issues []Issue, _
 		for _, g := range visitor.sortGroups {
 			sortedNodes := make([]dst.Node, len(g.nodes))
 			copy(sortedNodes, g.nodes)
-			sort.Sort(sortNodesLexicographically{nodes: sortedNodes, fset: fset, decorator: dcrtr})
+			sort.Sort(sortNodes{nodes: sortedNodes, fset: fset, decorator: dcrtr})
 			unsorted := false
 			for dstIndex, orig := range g.nodes {
 				// if we've moved this node
@@ -278,26 +279,51 @@ func (v *sortVisitor) calculateNodeStartLine(node dst.Node) int {
 	return nodeStartLine
 }
 
-type sortNodesLexicographically struct {
+type sortNodes struct {
 	nodes     []dst.Node
 	fset      *token.FileSet
 	decorator *decorator.Decorator
 }
 
-func (s sortNodesLexicographically) Len() int {
+func (s sortNodes) Len() int {
 	return len(s.nodes)
 }
 
-func (s sortNodesLexicographically) Less(a, b int) bool {
+func (s sortNodes) Less(a, b int) bool {
+	astNodeA := s.decorator.Ast.Nodes[s.nodes[a]]
+	switch astNodeA := astNodeA.(type) {
+	case *ast.BasicLit:
+		switch astNodeA.Kind {
+		case token.INT, token.FLOAT:
+			var fA, fB big.Float
+			_, _, _ = fA.SetPrec(1000).Parse(astNodeA.Value, 0)
+			astNodeB := s.decorator.Ast.Nodes[s.nodes[b]]
+			if astNodeB, bothAreNumbers := astNodeB.(*ast.BasicLit); !bothAreNumbers {
+				return false
+			} else {
+				_, _, _ = fB.SetPrec(1000).Parse(astNodeB.Value, 0)
+			}
+			return fA.Cmp(&fB) == -1
+		}
+	}
 	return s.renderNode(s.nodes[a]) < s.renderNode(s.nodes[b])
 }
 
-func (s sortNodesLexicographically) Swap(a, b int) {
+func (s sortNodes) Swap(a, b int) {
 	s.nodes[a], s.nodes[b] = s.nodes[b], s.nodes[a]
 }
 
-func (s sortNodesLexicographically) renderNode(node dst.Node) string {
+func (s sortNodes) renderNode(node dst.Node) string {
 	astNode := stripComments(s.decorator.Ast.Nodes[node])
+
+	// printer doesn't handle fields, so substitute name, if available, otherwise type
+	if field, ok := astNode.(*ast.Field); ok {
+		if len(field.Names) > 0 {
+			astNode = field.Names[0]
+		} else {
+			astNode = field.Type
+		}
+	}
 
 	var buf bytes.Buffer
 	if err := printer.Fprint(&buf, s.fset, stripComments(astNode)); err != nil {

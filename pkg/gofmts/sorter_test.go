@@ -16,8 +16,6 @@ func TestSorter(t *testing.T) {
 	makeInputs := func(t *testing.T, src string) (*token.FileSet, *ast.File) {
 		fset := token.NewFileSet()
 		src = strings.TrimLeftFunc(src, unicode.IsSpace)
-		//formatted, err := format.Source([]byte(src))
-		//require.NoError(t, err)
 		f, err := parser.ParseFile(fset, "", src, parser.ParseComments)
 		require.NoError(t, err)
 		return fset, f
@@ -108,6 +106,106 @@ func TestSorter(t *testing.T) {
 		require.Implements(t, (*IssueWithReplacement)(nil), issues[0])
 		assert.Equal(t, "const A = 2\nconst Z = 1\n",
 			issues[0].(IssueWithReplacement).Replacement())
+	})
+
+	t.Run("it sorts strings by value", func(t *testing.T) {
+		issues, err := srtr.Run(makeInputs(t,
+			//gofmts:go
+			`
+				package main
+				
+				var x = []string{
+					//gofmts:sort
+					"Z",
+					"A",
+				}
+				`))
+		require.NoError(t, err)
+		require.Len(t, issues, 1)
+		assert.Equal(t, "block is unsorted", issues[0].Details())
+		assert.Equal(t, 5, issues[0].Position().Line)
+		require.Implements(t, (*IssueWithReplacement)(nil), issues[0])
+		assert.Equal(t, "\t\"A\",\n\t\"Z\",\n", issues[0].(IssueWithReplacement).Replacement())
+	})
+
+	t.Run("it sorts literals by value", func(t *testing.T) {
+		issues, err := srtr.Run(makeInputs(t,
+			//gofmts:go
+			`
+				package main
+				
+				var x = []float{
+					//gofmts:sort
+					12.3,
+					2,
+				}
+				`))
+		require.NoError(t, err)
+		require.Len(t, issues, 1)
+		assert.Equal(t, "block is unsorted", issues[0].Details())
+		assert.Equal(t, 5, issues[0].Position().Line)
+		require.Implements(t, (*IssueWithReplacement)(nil), issues[0])
+		assert.Equal(t, "\t2,\n\t12.3,\n", issues[0].(IssueWithReplacement).Replacement())
+	})
+
+	t.Run("it sorts struct fields", func(t *testing.T) {
+		issues, err := srtr.Run(makeInputs(t,
+			//gofmts:go
+			`
+				package main
+				
+				type t struct {
+					//gofmts:sort
+					b int
+					a int
+				}
+				`))
+		require.NoError(t, err)
+		require.Len(t, issues, 1)
+		assert.Equal(t, "block is unsorted", issues[0].Details())
+		assert.Equal(t, 5, issues[0].Position().Line)
+		require.Implements(t, (*IssueWithReplacement)(nil), issues[0])
+		assert.Equal(t, "\ta int\n\tb int\n", issues[0].(IssueWithReplacement).Replacement())
+	})
+
+	t.Run("it sorts anonymous struct fields", func(t *testing.T) {
+		issues, err := srtr.Run(makeInputs(t,
+			//gofmts:go
+			`
+				package main
+				
+				type t struct {
+					//gofmts:sort
+					B
+					A
+				}
+				`))
+		require.NoError(t, err)
+		require.Len(t, issues, 1)
+		assert.Equal(t, "block is unsorted", issues[0].Details())
+		assert.Equal(t, 5, issues[0].Position().Line)
+		require.Implements(t, (*IssueWithReplacement)(nil), issues[0])
+		assert.Equal(t, "\tA\n\tB\n", issues[0].(IssueWithReplacement).Replacement())
+	})
+
+	t.Run("it doesn't blow up wih mismatched types", func(t *testing.T) {
+		issues, err := srtr.Run(makeInputs(t,
+			//gofmts:go
+			`
+				package main
+				
+				var x = []int{
+					//gofmts:sort
+					1,
+					"not a number",
+				}
+				`))
+		require.NoError(t, err)
+		require.Len(t, issues, 1)
+		assert.Equal(t, "block is unsorted", issues[0].Details())
+		assert.Equal(t, 5, issues[0].Position().Line)
+		require.Implements(t, (*IssueWithReplacement)(nil), issues[0])
+		assert.Equal(t, "\t\"not a number\",\n\t1,\n", issues[0].(IssueWithReplacement).Replacement())
 	})
 
 	t.Run("it fails back-to-back with unused directive", func(t *testing.T) {
