@@ -37,3 +37,6 @@ const (
 	A3 = 2
 	Z3 = 1
 )
+
+//gofmts:go
+const expr = "1 + 2"

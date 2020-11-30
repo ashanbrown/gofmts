@@ -27,3 +27,6 @@ const (
 	// move this
 	A3 = 2
 )
+
+//gofmts:go
+const expr = "1 +  2"
