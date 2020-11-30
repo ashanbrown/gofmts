@@ -4,35 +4,26 @@ package example
 
 //gofmts:sql
 const Sql = `
-		SELECT
-		  *
-		FROM
-		  mytable
-		`
+SELECT * FROM mytable `
 
 //gofmts:json
 const Json = `
-		{
-		  "a": 1,
-		  "b": 2,
-		  "c": [1, 2, 3]
-		}
-		`
+{"a":  1, "b":2, "c": [1, 2, 3]}`
 
 //gofmts:sort
-const A = 2
 const Z = 1
+const A = 2
 
 const (
 	//gofmts:sort
 	// ignore this
-	A2 = 2
 	Z1 = 1
+	A2 = 2
 )
 
 const (
 	//gofmts:sort
+	Z3 = 1
 	// move this
 	A3 = 2
-	Z3 = 1
 )
