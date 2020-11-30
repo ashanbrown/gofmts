@@ -14,3 +14,11 @@ jobs:
       - uses: pre-commit/action@v2.0.0
         env:
           SKIP: no-commit-to-branch
+      - name: Test out exported pre-commit hook
+        run: pre-commit try-repo . gofmts --verbose --files pkg/gocmts/*
+      - uses: goreleaser/goreleaser-action@v2
+        with:
+          version: latest
+          args: release --snapshot --skip-publish --rm-dist
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
