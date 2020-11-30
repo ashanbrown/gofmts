@@ -7,5 +7,5 @@
 - id: gofmts-docker
   name: gofmts
   language: docker_image
-  entry: "ghcr.io/ashanbrown/gofmts:latest"
+  entry: ghcr.io/ashanbrown/gofmts:latest -l -w
   types: [go]
