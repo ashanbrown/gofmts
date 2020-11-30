@@ -40,7 +40,7 @@ dockers:
     binaries:
       - gofmts
     image_templates:
-      - "ghcr.io/ashanbrown/{{.ProjectName}}:{{ .Tab }}"
+      - "ghcr.io/ashanbrown/{{.ProjectName}}:{{ .Tag }}"
       - "ghcr.io/ashanbrown/{{.ProjectName}}:v{{ .Major }}"
       - "ghcr.io/ashanbrown/{{.ProjectName}}:v{{ .Major }}.{{ .Minor }}"
       - "ghcr.io/ashanbrown/{{.ProjectName}}:latest"
