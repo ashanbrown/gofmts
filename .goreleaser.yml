@@ -1,5 +1,3 @@
-project: gofmts
-
 before:
   hooks:
     - go mod download
