@@ -2,10 +2,12 @@
   name: gofmts
   language: golang
   entry: gofmts -l -w
+  exclude: "^vendor/"
   types: [go]
 
 - id: gofmts-docker
   name: gofmts
   language: docker_image
-  entry: ghcr.io/ashanbrown/gofmts:latest -l -w
+  entry: "ghcr.io/ashanbrown/gofmts:latest -l -w"
+  exclude: "^vendor/"
   types: [go]
