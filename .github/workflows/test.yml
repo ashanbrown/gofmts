@@ -15,7 +15,7 @@ jobs:
         env:
           SKIP: no-commit-to-branch
       - name: Run tests
-	run: make test
+        run: make test
       - name: Test out exported pre-commit hook
         run: pre-commit try-repo . gofmts --verbose --files pkg/gocmts/*
       - uses: goreleaser/goreleaser-action@v2
