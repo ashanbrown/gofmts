@@ -1,4 +1,4 @@
-// +build !analyze
+// +build never
 
 package example
 
