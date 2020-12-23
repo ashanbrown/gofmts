@@ -1,4 +1,4 @@
-module github.com/ashanbrown/gfmts
+module github.com/ashanbrown/gofmts
 
 go 1.15
 

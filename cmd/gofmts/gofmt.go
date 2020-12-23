@@ -20,7 +20,7 @@ import (
 	"runtime/pprof"
 	"strings"
 
-	"github.com/ashanbrown/gfmts/cmd/gofmts/internal/diff"
+	"github.com/ashanbrown/gofmts/cmd/gofmts/internal/diff"
 )
 
 var (

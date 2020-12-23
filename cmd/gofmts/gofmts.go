@@ -6,8 +6,9 @@ import (
 	"go/scanner"
 	"io/ioutil"
 
-	"github.com/ashanbrown/gfmts/pkg/gofmts"
 	"github.com/pkg/errors"
+
+	"github.com/ashanbrown/gofmts/pkg/gofmts"
 )
 
 func reformatFile(src []byte, file *ast.File) error {
