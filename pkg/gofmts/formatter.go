@@ -26,6 +26,7 @@ const tabWidth = 8
 type Issue interface {
 	Details() string
 	Position() token.Position
+	Pos() token.Pos
 	String() string
 }
 
@@ -53,6 +54,7 @@ func FormatFile(src []byte, fset *token.FileSet, file *ast.File) ([]Issue, error
 
 type FormatIssue struct {
 	directive   string
+	pos         token.Pos
 	position    token.Position
 	end         token.Position
 	replacement string
@@ -60,6 +62,10 @@ type FormatIssue struct {
 
 func (i FormatIssue) Details() string {
 	return fmt.Sprintf("%s formatting differs", i.directive)
+}
+
+func (i FormatIssue) Pos() token.Pos {
+	return i.pos
 }
 
 func (i FormatIssue) Position() token.Position {
@@ -80,11 +86,16 @@ func toString(i Issue) string {
 
 type UnusedDirective struct {
 	name     string
+	pos      token.Pos
 	position token.Position
 }
 
 func (i UnusedDirective) Details() string {
 	return fmt.Sprintf("unused directive `%s%s`", directivePrefix, i.name)
+}
+
+func (i UnusedDirective) Pos() token.Pos {
+	return i.pos
 }
 
 func (i UnusedDirective) Position() token.Position {
@@ -95,11 +106,16 @@ func (i UnusedDirective) String() string { return toString(i) }
 
 type UnknownDirective struct {
 	directive string
+	pos       token.Pos
 	position  token.Position
 }
 
 func (i UnknownDirective) Details() string {
 	return fmt.Sprintf("unknown directive `%s%s`", directivePrefix, i.directive)
+}
+
+func (i UnknownDirective) Pos() token.Pos {
+	return i.pos
 }
 
 func (i UnknownDirective) Position() token.Position {
@@ -110,12 +126,17 @@ func (i UnknownDirective) String() string { return toString(i) }
 
 type FailedDirective struct {
 	directive string
+	pos       token.Pos
 	position  token.Position
 	error     error
 }
 
 func (i FailedDirective) Details() string {
 	return fmt.Sprintf("failed directive %q: %s", i.directive, i.error)
+}
+
+func (i FailedDirective) Pos() token.Pos {
+	return i.pos
 }
 
 func (i FailedDirective) Position() token.Position {
@@ -171,7 +192,7 @@ func (f *Formatter) Run(src []byte, fset *token.FileSet, file *ast.File) ([]Issu
 	dst.Walk(&visitor, dstFile)
 	issues = append(issues, visitor.issues...)
 	for pos, d := range directivesByPos {
-		issues = append(issues, UnusedDirective{name: d, position: fset.Position(pos)})
+		issues = append(issues, UnusedDirective{name: d, pos: pos, position: fset.Position(pos)})
 	}
 
 	// apply replacements
@@ -225,6 +246,7 @@ ParseNode:
 			default:
 				v.issues = append(v.issues, UnknownDirective{
 					directive: closestDirective,
+					pos:       closestDirectivePos,
 					position:  v.fset.Position(closestDirectivePos),
 				})
 				break ParseNode
@@ -232,6 +254,7 @@ ParseNode:
 			if err != nil {
 				v.issues = append(v.issues, FailedDirective{
 					directive: closestDirective,
+					pos:       closestDirectivePos,
 					position:  v.fset.Position(closestDirectivePos),
 					error:     err,
 				})
@@ -242,6 +265,7 @@ ParseNode:
 			if isMultiline && node.Value[0] != '`' {
 				issue := FailedDirective{
 					directive: closestDirective,
+					pos:       astNode.Pos(),
 					position:  v.fset.Position(astNode.Pos()),
 					error:     errors.New("reformatted string will be multiline and must be quoted using backticks"),
 				}
@@ -292,6 +316,7 @@ ParseNode:
 
 			issue := FormatIssue{
 				directive:   closestDirective,
+				pos:         astNode.Pos(),
 				position:    position,
 				end:         v.fset.Position(astNode.End()),
 				replacement: replacementBuf.String(),

@@ -35,6 +35,7 @@ type Sorter struct {
 
 type SortIssue struct {
 	directive   string
+	pos         token.Pos
 	position    token.Position
 	end         token.Position
 	replacement string
@@ -42,6 +43,10 @@ type SortIssue struct {
 
 func (i SortIssue) Details() string {
 	return "block is unsorted"
+}
+
+func (i SortIssue) Pos() token.Pos {
+	return i.pos
 }
 
 func (i SortIssue) Position() token.Position {
@@ -152,9 +157,11 @@ func (s *Sorter) Run(fset *token.FileSet, files ...*ast.File) (issues []Issue, _
 			if !unsorted {
 				continue // no changes
 			}
+			startPos := g.startPos(dcrtr)
 			issue := SortIssue{
 				directive: g.directive,
-				position:  fset.Position(g.startPos(dcrtr)),
+				pos:       startPos,
+				position:  fset.Position(startPos),
 				end:       fset.Position(g.endPos(dcrtr)),
 			}
 			issues = append(issues, issue)
