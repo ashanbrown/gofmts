@@ -3,7 +3,7 @@ package analyzer_test
 import (
 	"testing"
 
-	"github.com/ashanbrown/gofmts/pkg/gofmts/analyzer"
+	"github.com/ashanbrown/gofmts/pkg/analyzer"
 	"golang.org/x/tools/go/analysis/analysistest"
 )
 
