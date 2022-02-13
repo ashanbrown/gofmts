@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"go/ast"
 	"go/printer"
 	"go/scanner"
@@ -11,7 +12,14 @@ import (
 	"github.com/ashanbrown/gofmts/pkg/gofmts"
 )
 
+var (
+	nextTabStop = flag.Bool("t", true, "position formatted strings at next tab stop")
+)
+
 func reformatFile(src []byte, file *ast.File) error {
+	if !*nextTabStop {
+		src = nil // if we don't send the source, we won't try to position formatted text at the next tab stop
+	}
 	if err := handleIssues(gofmts.FormatFile(src, fileSet, file)); err != nil {
 		return err
 	}
