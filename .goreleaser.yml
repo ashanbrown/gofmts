@@ -39,8 +39,6 @@ changelog:
 
 dockers:
   -
-    binaries:
-      - gofmts
     dockerfile: Dockerfile.goreleaser
     image_templates:
       - "ghcr.io/ashanbrown/{{.ProjectName}}:{{ .Tag }}"
