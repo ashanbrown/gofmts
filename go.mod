@@ -9,5 +9,8 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.7.0
 	github.com/tidwall/pretty v1.0.2
-	golang.org/x/tools v0.1.9-0.20211228192929-ee1ca4ffc4da
+	github.com/yuin/goldmark v1.4.6 // indirect
+	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
+	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect
+	golang.org/x/tools v0.1.9
 )
