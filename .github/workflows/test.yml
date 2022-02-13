@@ -9,15 +9,17 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-go@v2
         with:
-          go-version: 1.15
+          go-version: 1.17
       - uses: actions/setup-python@v2
+      - name: Go generate (to build golangci-lint plugin)
+        run: go generate ./...
       - uses: pre-commit/action@v2.0.0
         env:
           SKIP: no-commit-to-branch
       - name: Run tests
         run: make test
       - name: Test out exported pre-commit hook
-        run: pre-commit try-repo . gofmts --verbose --files pkg/gocmts/*
+        run: pre-commit try-repo . gofmts --verbose --files pkg/gofmts/*
       - uses: goreleaser/goreleaser-action@v2
         with:
           version: latest

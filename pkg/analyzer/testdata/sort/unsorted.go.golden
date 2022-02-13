@@ -1,0 +1,19 @@
+package sort
+
+//gofmts:sort
+const A = 2
+const Z = 1 // want "block is unsorted"
+
+const (
+	//gofmts:sort
+	// ignore this
+	A2 = 2
+	Z1 = 1 // want "block is unsorted"
+)
+
+const (
+	//gofmts:sort
+	// move this
+	A3 = 2
+	Z3 = 1 // want "block is unsorted"
+)

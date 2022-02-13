@@ -10,8 +10,8 @@ import (
 	"go/format"
 	"go/token"
 	"io"
+	"regexp"
 	"strings"
-	"unicode"
 
 	"github.com/dave/dst"
 	"github.com/dave/dst/decorator"
@@ -26,6 +26,7 @@ const tabWidth = 8
 type Issue interface {
 	Details() string
 	Position() token.Position
+	Pos() token.Pos
 	String() string
 }
 
@@ -53,6 +54,7 @@ func FormatFile(src []byte, fset *token.FileSet, file *ast.File) ([]Issue, error
 
 type FormatIssue struct {
 	directive   string
+	pos         token.Pos
 	position    token.Position
 	end         token.Position
 	replacement string
@@ -60,6 +62,10 @@ type FormatIssue struct {
 
 func (i FormatIssue) Details() string {
 	return fmt.Sprintf("%s formatting differs", i.directive)
+}
+
+func (i FormatIssue) Pos() token.Pos {
+	return i.pos
 }
 
 func (i FormatIssue) Position() token.Position {
@@ -80,11 +86,16 @@ func toString(i Issue) string {
 
 type UnusedDirective struct {
 	name     string
+	pos      token.Pos
 	position token.Position
 }
 
 func (i UnusedDirective) Details() string {
 	return fmt.Sprintf("unused directive `%s%s`", directivePrefix, i.name)
+}
+
+func (i UnusedDirective) Pos() token.Pos {
+	return i.pos
 }
 
 func (i UnusedDirective) Position() token.Position {
@@ -95,11 +106,16 @@ func (i UnusedDirective) String() string { return toString(i) }
 
 type UnknownDirective struct {
 	directive string
+	pos       token.Pos
 	position  token.Position
 }
 
 func (i UnknownDirective) Details() string {
 	return fmt.Sprintf("unknown directive `%s%s`", directivePrefix, i.directive)
+}
+
+func (i UnknownDirective) Pos() token.Pos {
+	return i.pos
 }
 
 func (i UnknownDirective) Position() token.Position {
@@ -110,12 +126,17 @@ func (i UnknownDirective) String() string { return toString(i) }
 
 type FailedDirective struct {
 	directive string
+	pos       token.Pos
 	position  token.Position
 	error     error
 }
 
 func (i FailedDirective) Details() string {
 	return fmt.Sprintf("failed directive %q: %s", i.directive, i.error)
+}
+
+func (i FailedDirective) Pos() token.Pos {
+	return i.pos
 }
 
 func (i FailedDirective) Position() token.Position {
@@ -134,6 +155,9 @@ type formatVisitor struct {
 	src             []byte
 }
 
+var directivePattern = regexp.MustCompile(`//` + directivePrefix + `\s*(\S+)\s*(//.*)?`)
+
+// Run calculates the issues.  "src" is the representation of the source, which is used to determine the next tab stop for indentation
 func (f *Formatter) Run(src []byte, fset *token.FileSet, file *ast.File) ([]Issue, error) {
 	var issues []Issue // nolint:prealloc // don't know how many there will be
 	dcrtr := decorator.NewDecorator(fset)
@@ -146,17 +170,12 @@ func (f *Formatter) Run(src []byte, fset *token.FileSet, file *ast.File) ([]Issu
 	issuesByNode := make(map[dst.Node]Issue)      // nolint:prealloc // don't know how many there will be
 	for _, group := range file.Comments {
 		for _, comment := range group.List {
-			if comment.Text[1] == '*' { // only allow directives on //-style comments
-				continue
-			}
-
-			if strings.HasPrefix(comment.Text[2:], directivePrefix) {
+			matches := directivePattern.FindStringSubmatch(comment.Text)
+			if matches != nil {
 				// ignore sort directives
-				if strings.HasPrefix(comment.Text[2:], directivePrefix+"sort") {
-					continue
+				if matches[1] != "sort" {
+					directivesByPos[comment.End()] = matches[1]
 				}
-				parts := strings.SplitN(comment.Text[2:], ":", 2)
-				directivesByPos[comment.End()] = strings.TrimRightFunc(parts[1], unicode.IsSpace)
 			}
 		}
 	}
@@ -171,7 +190,7 @@ func (f *Formatter) Run(src []byte, fset *token.FileSet, file *ast.File) ([]Issu
 	dst.Walk(&visitor, dstFile)
 	issues = append(issues, visitor.issues...)
 	for pos, d := range directivesByPos {
-		issues = append(issues, UnusedDirective{name: d, position: fset.Position(pos)})
+		issues = append(issues, UnusedDirective{name: d, pos: pos, position: fset.Position(pos)})
 	}
 
 	// apply replacements
@@ -225,6 +244,7 @@ ParseNode:
 			default:
 				v.issues = append(v.issues, UnknownDirective{
 					directive: closestDirective,
+					pos:       closestDirectivePos,
 					position:  v.fset.Position(closestDirectivePos),
 				})
 				break ParseNode
@@ -232,6 +252,7 @@ ParseNode:
 			if err != nil {
 				v.issues = append(v.issues, FailedDirective{
 					directive: closestDirective,
+					pos:       closestDirectivePos,
 					position:  v.fset.Position(closestDirectivePos),
 					error:     err,
 				})
@@ -242,6 +263,7 @@ ParseNode:
 			if isMultiline && node.Value[0] != '`' {
 				issue := FailedDirective{
 					directive: closestDirective,
+					pos:       astNode.Pos(),
 					position:  v.fset.Position(astNode.Pos()),
 					error:     errors.New("reformatted string will be multiline and must be quoted using backticks"),
 				}
@@ -292,6 +314,7 @@ ParseNode:
 
 			issue := FormatIssue{
 				directive:   closestDirective,
+				pos:         astNode.Pos(),
 				position:    position,
 				end:         v.fset.Position(astNode.End()),
 				replacement: replacementBuf.String(),
