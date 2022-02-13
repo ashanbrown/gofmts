@@ -11,7 +11,7 @@ repos:
       - id: end-of-file-fixer
       - id: no-commit-to-branch
       - id: trailing-whitespace
-        types: [markdown]
+        exclude:  "^(.*\\.go)$"
 
   - repo: local
     hooks:
@@ -30,7 +30,7 @@ repos:
         language: system
         require_serial: true
         types: [go]
-        exclude: "^(example/example.go|.*/testdata/.*\\.go)"
+        exclude: "^(example/example.go|.*/testdata/.*\\.go)$"
       - id: generate
         name: generate
         description: ensure that running go generate changes nothing
