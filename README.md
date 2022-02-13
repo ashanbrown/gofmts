@@ -62,6 +62,8 @@ You can also run it on all your files via your pre-commit.com pre-commit hooks b
         - id: gofmts-docker
 ```
 
+`gofmts` will indent embedded strings to try to keep your code readable.  By default, `gofmts` will place formatted strings at the next tab stop after quote, but this behavior is not available when used as a `go/analysis.Analyzer` (because the source code is unavailable to the linter).  This behavior can be explicitly disabled on the command-line by setting`-t=false`.
+
 ## Exported Analyzers for use with `go/aanalysis`.
 
 In `pkg/analyzers`, both a `SortAnalyzer` and `FormatAnalyzer` are exported.  These implement the [`Analyzer` interface](https://pkg.go.dev/golang.org/x/tools/go/analysis#hdr-Analyzer) from the [`go/analysis` package](https://pkg.go.dev/golang.org/x/tools/go/analysis).  Because these the analyzer interface does not provide the source code with the formatter, the indent positioning of a formatted string may differ.
