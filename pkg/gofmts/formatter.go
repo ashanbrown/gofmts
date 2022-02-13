@@ -10,8 +10,8 @@ import (
 	"go/format"
 	"go/token"
 	"io"
+	"regexp"
 	"strings"
-	"unicode"
 
 	"github.com/dave/dst"
 	"github.com/dave/dst/decorator"
@@ -155,6 +155,9 @@ type formatVisitor struct {
 	src             []byte
 }
 
+var directivePattern = regexp.MustCompile(`//` + directivePrefix + `\s*(\S+)\s*(//.*)?`)
+
+// Run calculates the issues.  "src" is the representation of the source, which is used to determine the tab stop
 func (f *Formatter) Run(src []byte, fset *token.FileSet, file *ast.File) ([]Issue, error) {
 	var issues []Issue // nolint:prealloc // don't know how many there will be
 	dcrtr := decorator.NewDecorator(fset)
@@ -167,17 +170,12 @@ func (f *Formatter) Run(src []byte, fset *token.FileSet, file *ast.File) ([]Issu
 	issuesByNode := make(map[dst.Node]Issue)      // nolint:prealloc // don't know how many there will be
 	for _, group := range file.Comments {
 		for _, comment := range group.List {
-			if comment.Text[1] == '*' { // only allow directives on //-style comments
-				continue
-			}
-
-			if strings.HasPrefix(comment.Text[2:], directivePrefix) {
+			matches := directivePattern.FindStringSubmatch(comment.Text)
+			if matches != nil {
 				// ignore sort directives
-				if strings.HasPrefix(comment.Text[2:], directivePrefix+"sort") {
-					continue
+				if matches[1] != "sort" {
+					directivesByPos[comment.End()] = matches[1]
 				}
-				parts := strings.SplitN(comment.Text[2:], ":", 2)
-				directivesByPos[comment.End()] = strings.TrimRightFunc(parts[1], unicode.IsSpace)
 			}
 		}
 	}

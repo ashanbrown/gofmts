@@ -147,7 +147,7 @@ func (s *Sorter) Run(fset *token.FileSet, files ...*ast.File) (issues []Issue, _
 						repl.Decorations().Before = orig.Decorations().Before
 					case len(g.nodes) - 1:
 						// make sure we retain a space after the group if we change the last node
-						repl.Decorations().After = dst.EmptyLine
+						repl.Decorations().After = orig.Decorations().After
 					}
 
 					replacementNodes[orig] = repl

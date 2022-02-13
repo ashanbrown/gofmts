@@ -27,7 +27,7 @@ repos:
         language: system
         require_serial: true
         types: [go]
-        exclude: "example/example.go"
+        exclude: "^(example/example.go|.*/testdata/.*\\.go)"
       - id: generate
         name: generate
         description: ensure that running go generate changes nothing
