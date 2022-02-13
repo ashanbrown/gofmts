@@ -18,3 +18,7 @@ issues:
     - path: cmd/gofmts/gofmt.go
       linters:
         - errcheck
+    # ignore gofmts formatting because as a plugin, we can't guess the final tab stop position when indenting 
+    - linters:
+        - gofmts
+      text: ^gofmts_format
