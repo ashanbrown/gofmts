@@ -157,7 +157,7 @@ type formatVisitor struct {
 
 var directivePattern = regexp.MustCompile(`//` + directivePrefix + `\s*(\S+)\s*(//.*)?`)
 
-// Run calculates the issues.  "src" is the representation of the source, which is used to determine the tab stop
+// Run calculates the issues.  "src" is the representation of the source, which is used to determine the next tab stop for indentation
 func (f *Formatter) Run(src []byte, fset *token.FileSet, file *ast.File) ([]Issue, error) {
 	var issues []Issue // nolint:prealloc // don't know how many there will be
 	dcrtr := decorator.NewDecorator(fset)

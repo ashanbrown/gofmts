@@ -1,5 +1,5 @@
-//go:build never
-// +build never
+//go:build ignore
+// +build ignore
 
 package example
 

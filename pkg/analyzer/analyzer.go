@@ -9,7 +9,7 @@ import (
 )
 
 var SortAnalyzer = &analysis.Analyzer{
-	Name: "gofmts:sort",
+	Name: "gofmts_sort",
 	Doc:  "ensure sort order of code blocks",
 	Run:  runSortAnalysis,
 }
@@ -26,7 +26,7 @@ func runSortAnalysis(pass *analysis.Pass) (interface{}, error) {
 }
 
 var FormatAnalyzer = &analysis.Analyzer{
-	Name: "gofmts",
+	Name: "gofmts_format",
 	Doc:  "canonicalize string formatting",
 	Run:  runFormatAnalysis,
 }
@@ -49,7 +49,7 @@ func reportIssues(pass *analysis.Pass, issues []gofmts.Issue, prompt string) {
 		diag := analysis.Diagnostic{
 			Pos:      i.Pos(),
 			Message:  i.Details(),
-			Category: "style",
+			Category: "format",
 		}
 		if ii, ok := i.(gofmts.IssueWithReplacement); ok {
 			diag.End = diag.Pos + token.Pos(ii.Length()) + 1

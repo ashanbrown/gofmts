@@ -2,8 +2,23 @@ run:
   build-tags:
     - analyze
 
+linters:
+  enable:
+    - gofmts
+
+linters-settings:
+  custom:
+    gofmts:
+      path: golangci-lint/plugin.so
+      description: gofmts
+      original-url: github.com/ashanbrown/gofmts
+
 issues:
   exclude-rules:
     - path: cmd/gofmts/gofmt.go
       linters:
         - errcheck
+    # ignore gofmts formatting because as a plugin, we can't guess the final tab stop position when indenting 
+    - linters:
+        - gofmts
+      text: ^gofmts_format
