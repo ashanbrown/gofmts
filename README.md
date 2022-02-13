@@ -76,7 +76,7 @@ A [plugin](./golangci-lint/plugin.go) is provided for use with the [Golangci-lin
 linters-settings:
   custom:
     gofmts:
-      path: golangci-lint/plugin.so
+      path: <path to the package in your build>/plugin.so
       description: gofmts
       original-url: github.com/ashanbrown/gofmts
 ```
