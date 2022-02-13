@@ -27,14 +27,14 @@ func TestSorter(t *testing.T) {
 		issues, err := srtr.Run(makeInputs(t,
 			//gofmts:go
 			`
-					package main
-					
-					const (
-						//gofmts:sort
-						Z = 2
-						A = 1
-					)
-					`))
+				package main
+				
+				const (
+					//gofmts:sort
+					Z = 2
+					A = 1
+				)
+				`))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "block is unsorted", issues[0].Details())
@@ -47,15 +47,15 @@ func TestSorter(t *testing.T) {
 		issues, err := srtr.Run(makeInputs(t,
 			//gofmts:go
 			`
-					package main
-					
-					const (
-						//gofmts:sort
-						Z = 2
-						// B = 1
-						A = 1
-					)
-					`))
+				package main
+				
+				const (
+					//gofmts:sort
+					Z = 2
+					// B = 1
+					A = 1
+				)
+				`))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "block is unsorted", issues[0].Details())
@@ -69,15 +69,15 @@ func TestSorter(t *testing.T) {
 		issues, err := srtr.Run(makeInputs(t,
 			//gofmts:go
 			`
-					package main
-					
-					const (
-						//gofmts:sort
-						// B = 1
-						Z = 2
-						A = 1
-					)
-					`))
+				package main
+				
+				const (
+					//gofmts:sort
+					// B = 1
+					Z = 2
+					A = 1
+				)
+				`))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "block is unsorted", issues[0].Details())
@@ -91,14 +91,14 @@ func TestSorter(t *testing.T) {
 		issues, err := srtr.Run(makeInputs(t,
 			//gofmts:go
 			`
-					package main
-					
-					//gofmts:sort
-					const Z = 1
-					const A = 2
-					
-					const B = 3
-					`))
+				package main
+				
+				//gofmts:sort
+				const Z = 1
+				const A = 2
+				
+				const B = 3
+				`))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "block is unsorted", issues[0].Details())
@@ -112,14 +112,14 @@ func TestSorter(t *testing.T) {
 		issues, err := srtr.Run(makeInputs(t,
 			//gofmts:go
 			`
-					package main
-					
-					var x = []string{
-						//gofmts:sort
-						"Z",
-						"A",
-					}
-					`))
+				package main
+				
+				var x = []string{
+					//gofmts:sort
+					"Z",
+					"A",
+				}
+				`))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "block is unsorted", issues[0].Details())
@@ -132,14 +132,14 @@ func TestSorter(t *testing.T) {
 		issues, err := srtr.Run(makeInputs(t,
 			//gofmts:go
 			`
-					package main
-					
-					var x = []float{
-						//gofmts:sort
-						12.3,
-						2,
-					}
-					`))
+				package main
+				
+				var x = []float{
+					//gofmts:sort
+					12.3,
+					2,
+				}
+				`))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "block is unsorted", issues[0].Details())
@@ -152,14 +152,14 @@ func TestSorter(t *testing.T) {
 		issues, err := srtr.Run(makeInputs(t,
 			//gofmts:go
 			`
-					package main
-					
-					type t struct {
-						//gofmts:sort
-						b int
-						a int
-					}
-					`))
+				package main
+				
+				type t struct {
+					//gofmts:sort
+					b int
+					a int
+				}
+				`))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "block is unsorted", issues[0].Details())
@@ -172,14 +172,14 @@ func TestSorter(t *testing.T) {
 		issues, err := srtr.Run(makeInputs(t,
 			//gofmts:go
 			`
-					package main
-					
-					type t struct {
-						//gofmts:sort
-						B
-						A
-					}
-					`))
+				package main
+				
+				type t struct {
+					//gofmts:sort
+					B
+					A
+				}
+				`))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "block is unsorted", issues[0].Details())
@@ -192,14 +192,14 @@ func TestSorter(t *testing.T) {
 		issues, err := srtr.Run(makeInputs(t,
 			//gofmts:go
 			`
-					package main
-					
-					var x = []int{
-						//gofmts:sort
-						1,
-						"not a number",
-					}
-					`))
+				package main
+				
+				var x = []int{
+					//gofmts:sort
+					1,
+					"not a number",
+				}
+				`))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "block is unsorted", issues[0].Details())
@@ -212,16 +212,16 @@ func TestSorter(t *testing.T) {
 		issues, err := srtr.Run(makeInputs(t,
 			//gofmts:go
 			`
-					package main
-					
-					//gofmts:sort
-					const Z = 1
-					const A = 2
-					
-					//gofmts:sort
-					const Y = 1
-					const B = 2
-					`))
+				package main
+				
+				//gofmts:sort
+				const Z = 1
+				const A = 2
+				
+				//gofmts:sort
+				const Y = 1
+				const B = 2
+				`))
 		require.NoError(t, err)
 		require.Len(t, issues, 2)
 		assert.Equal(t, "block is unsorted", issues[0].Details())
@@ -236,10 +236,10 @@ func TestSorter(t *testing.T) {
 		issues, err := srtr.Run(makeInputs(t,
 			//gofmts:go
 			`
-					package main
-					
-					//gofmts:sort
-					`))
+				package main
+				
+				//gofmts:sort
+				`))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "unused directive `gofmts:sort`", issues[0].Details())
@@ -250,12 +250,12 @@ func TestSorter(t *testing.T) {
 		issues, err := srtr.Run(makeInputs(t,
 			//gofmts:go
 			`
-					package main
-					
-					//gofmts:sort
-					
-					const A = 1
-					`))
+				package main
+				
+				//gofmts:sort
+				
+				const A = 1
+				`))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "unused directive `gofmts:sort`", issues[0].Details())

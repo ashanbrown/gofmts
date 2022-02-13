@@ -86,11 +86,11 @@ func TestFormatter(t *testing.T) {
 		issues, err := fmtr.Run(makeInputs(t,
 			//gofmts:go
 			`
-					package main
-					
-					//gofmts:sql
-					const sql = "SELECT * FROM mytable"
-					`))
+				package main
+				
+				//gofmts:sql
+				const sql = "SELECT * FROM mytable"
+				`))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, `failed directive "sql": reformatted string will be multiline and must be quoted using backticks`, issues[0].Details())
@@ -132,11 +132,11 @@ func TestFormatter(t *testing.T) {
 		//gofmts:go
 		issues, err := fmtr.Run(makeInputs(t,
 			`
-					package main
-					
-					//gofmts:unknown
-					const value = ""
-					`))
+				package main
+				
+				//gofmts:unknown
+				const value = ""
+				`))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "unknown directive `gofmts:unknown`", issues[0].Details())
@@ -147,10 +147,10 @@ func TestFormatter(t *testing.T) {
 		issues, err := fmtr.Run(makeInputs(t,
 			//gofmts:go
 			`
-					package main
-					
-					//gofmts:sql
-					`))
+				package main
+				
+				//gofmts:sql
+				`))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "unused directive `gofmts:sql`", issues[0].Details())
@@ -161,11 +161,11 @@ func TestFormatter(t *testing.T) {
 		issues, err := fmtr.Run(makeInputs(t,
 			//gofmts:go
 			`
-					package main
-					
-					//gofmts:go
-					const expr = "1  + 2"
-					`))
+				package main
+				
+				//gofmts:go
+				const expr = "1  + 2"
+				`))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, "go formatting differs", issues[0].Details())
@@ -178,11 +178,11 @@ func TestFormatter(t *testing.T) {
 		issues, err := fmtr.Run(makeInputs(t,
 			//gofmts:go
 			`
-					package main
-					
-					//gofmts:go
-					const expr = "1 +"
-					`))
+				package main
+				
+				//gofmts:go
+				const expr = "1 +"
+				`))
 		require.NoError(t, err)
 		require.Len(t, issues, 1)
 		assert.Equal(t, `failed directive "go": unable to format go code: 3:1: expected operand, found '}'`,
