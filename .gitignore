@@ -1,3 +1,4 @@
 /cmd/gofmts/gofmts
 /dist/
 /golangci-lint/plugin.so
+/example/example_check.go
