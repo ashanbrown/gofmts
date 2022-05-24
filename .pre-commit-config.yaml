@@ -19,9 +19,9 @@ repos:
       - id: golangci-lint
         name: golangci-lint
         description: Fast linters runner for Go.
-        entry: go run github.com/golangci/golangci-lint/cmd/golangci-lint run --fix
+        entry: go run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run --fix
         types: [go]
-        language: golang
+        language: system
         pass_filenames: false
       - id: gofmts
         name: Dogfooding (gofmts)
